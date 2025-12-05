@@ -2,8 +2,6 @@
 // Note: Server-side clients cannot be singletons because each request needs fresh cookies.
 // The "Multiple GoTrueClient" warning on the server is expected and harmless.
 
-import "server-only"
-
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
 

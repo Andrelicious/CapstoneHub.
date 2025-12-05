@@ -150,7 +150,7 @@ importers:
         specifier: latest
         version: 3.5.1(@types/react@19.0.0)(react-dom@19.2.0(react@19.2.0))(react-is@19.2.1)(react@19.2.0)(redux@5.0.1)
       server-only:
-        specifier: latest
+        specifier: 0.0.1
         version: 0.0.1
       sonner:
         specifier: latest
