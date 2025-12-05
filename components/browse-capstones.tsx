@@ -5,6 +5,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Badge } from "@/components/ui/badge"
+import { useToast } from "@/hooks/use-toast"
 import {
   Search,
   Filter,
@@ -50,6 +51,8 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>("recent")
   const [viewMode, setViewMode] = useState<ViewMode>("list")
+  const [favorites, setFavorites] = useState<Set<string>>(new Set())
+  const { toast } = useToast()
 
   const filteredAndSortedCapstones = useMemo(() => {
     const result = initialCapstones.filter((capstone) => {
@@ -64,7 +67,6 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
       return matchesSearch && matchesCategory && matchesYear
     })
 
-    // Sort results
     result.sort((a, b) => {
       switch (sortBy) {
         case "recent":
@@ -88,6 +90,38 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
     setSelectedCategory("All Categories")
     setSelectedYear("All Years")
     setSortBy("recent")
+  }
+
+  const toggleFavorite = (id: string, title: string) => {
+    setFavorites((prev) => {
+      const newFavorites = new Set(prev)
+      if (newFavorites.has(id)) {
+        newFavorites.delete(id)
+        toast({
+          title: "Removed from favorites",
+          description: `"${title.slice(0, 40)}..." removed from your favorites (local only)`,
+        })
+      } else {
+        newFavorites.add(id)
+        toast({
+          title: "Added to favorites",
+          description: `"${title.slice(0, 40)}..." added to your favorites (local only)`,
+        })
+      }
+      return newFavorites
+    })
+  }
+
+  const handleDownload = (pdfUrl: string | null, title: string) => {
+    if (pdfUrl) {
+      window.open(pdfUrl, "_blank")
+    } else {
+      toast({
+        title: "Download unavailable",
+        description: "No PDF file is available for this capstone.",
+        variant: "destructive",
+      })
+    }
   }
 
   const hasActiveFilters = searchQuery || selectedCategory !== "All Categories" || selectedYear !== "All Years"
@@ -307,9 +341,11 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
       {filteredAndSortedCapstones.length === 0 ? (
         <div className="text-center py-16 glass rounded-2xl border border-white/10">
           <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-xl font-semibold text-white mb-2">No capstones found</h3>
+          <h3 className="text-xl font-semibold text-white mb-2">No capstone projects found</h3>
           <p className="text-muted-foreground mb-6">
-            {hasActiveFilters ? "Try adjusting your search or filters" : "No approved capstones available yet"}
+            {hasActiveFilters
+              ? "Try adjusting your search or filters"
+              : "No approved capstones available yet. Check back soon!"}
           </p>
           {hasActiveFilters && (
             <Button
@@ -390,21 +426,25 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                       View Details
                     </Button>
                   </Link>
-                  {capstone.pdf_url && (
-                    <Button
-                      variant="outline"
-                      className="flex-1 lg:flex-none bg-white/5 border-white/10 text-white hover:bg-white/10"
-                    >
-                      <Download className="w-4 h-4 mr-2" />
-                      Download
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    className="flex-1 lg:flex-none bg-white/5 border-white/10 text-white hover:bg-white/10"
+                    onClick={() => handleDownload(capstone.pdf_url, capstone.title)}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
                   <Button
                     variant="outline"
                     size="icon"
-                    className="bg-white/5 border-white/10 text-white hover:bg-pink-500/10 hover:border-pink-500/30 hover:text-pink-400"
+                    className={`bg-white/5 border-white/10 hover:bg-pink-500/10 hover:border-pink-500/30 ${
+                      favorites.has(capstone.id)
+                        ? "text-pink-400 border-pink-500/30 bg-pink-500/10"
+                        : "text-white hover:text-pink-400"
+                    }`}
+                    onClick={() => toggleFavorite(capstone.id, capstone.title)}
                   >
-                    <Heart className="w-4 h-4" />
+                    <Heart className={`w-4 h-4 ${favorites.has(capstone.id) ? "fill-current" : ""}`} />
                   </Button>
                 </div>
               </div>
@@ -419,9 +459,27 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
               key={capstone.id}
               className="group glass rounded-2xl border border-white/10 overflow-hidden hover:border-purple-500/50 transition-all duration-300 flex flex-col"
             >
-              {/* Thumbnail placeholder */}
-              <div className="h-40 bg-gradient-to-br from-purple-600/20 to-cyan-500/20 flex items-center justify-center">
-                <FileText className="w-16 h-16 text-white/20" />
+              {/* Thumbnail */}
+              <div className="h-40 bg-gradient-to-br from-purple-600/20 to-cyan-500/20 flex items-center justify-center relative">
+                {capstone.thumbnail_url ? (
+                  <img
+                    src={capstone.thumbnail_url || "/placeholder.svg"}
+                    alt={capstone.title}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <FileText className="w-16 h-16 text-white/20" />
+                )}
+                <button
+                  className={`absolute top-3 right-3 p-2 rounded-full transition-colors ${
+                    favorites.has(capstone.id)
+                      ? "bg-pink-500/20 text-pink-400"
+                      : "bg-black/40 text-white hover:bg-pink-500/20 hover:text-pink-400"
+                  }`}
+                  onClick={() => toggleFavorite(capstone.id, capstone.title)}
+                >
+                  <Heart className={`w-4 h-4 ${favorites.has(capstone.id) ? "fill-current" : ""}`} />
+                </button>
               </div>
 
               <div className="p-5 flex-1 flex flex-col">
@@ -461,9 +519,10 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                   <Button
                     size="sm"
                     variant="outline"
-                    className="bg-white/5 border-white/10 text-white hover:bg-pink-500/10 hover:border-pink-500/30 hover:text-pink-400"
+                    className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                    onClick={() => handleDownload(capstone.pdf_url, capstone.title)}
                   >
-                    <Heart className="w-4 h-4" />
+                    <Download className="w-4 h-4" />
                   </Button>
                 </div>
               </div>

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname, useRouter } from "next/navigation"
+import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Upload, Bell } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -22,9 +22,13 @@ export default function Navbar() {
   const [profilePanelOpen, setProfilePanelOpen] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
-  const router = useRouter()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const handleScroll = () => {
@@ -35,6 +39,8 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => {
+    if (!mounted) return
+
     const supabase = createClient()
 
     const fetchUserAndProfile = async (authUser: SupabaseUser | null) => {
@@ -63,6 +69,8 @@ export default function Navbar() {
       setLoading(false)
     }
 
+    // Start loading when checking auth
+    setLoading(true)
     supabase.auth.getUser().then(({ data: { user } }) => {
       fetchUserAndProfile(user)
     })
@@ -79,7 +87,7 @@ export default function Navbar() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [mounted])
 
   const getUserInitials = () => {
     if (profile?.display_name) {
@@ -108,6 +116,92 @@ export default function Navbar() {
   ]
 
   const unreadNotifications = 2
+
+  const renderAuthSection = () => {
+    // During SSR and initial load, show nothing to prevent flash
+    if (!mounted) {
+      return (
+        <div className="flex items-center gap-3">
+          <Link href="/login">
+            <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10">
+              Login
+            </Button>
+          </Link>
+          <Link href="/register">
+            <Button className="bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-500 hover:to-cyan-400 text-white border-0 shadow-lg shadow-purple-500/25">
+              Register
+            </Button>
+          </Link>
+        </div>
+      )
+    }
+
+    // Show loading skeleton while checking auth
+    if (loading) {
+      return <div className="w-24 h-10 bg-white/5 rounded-md animate-pulse" />
+    }
+
+    // User is logged in
+    if (user) {
+      return (
+        <>
+          <Link href="/upload">
+            <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10 gap-2">
+              <Upload className="w-4 h-4" />
+              Upload
+            </Button>
+          </Link>
+
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-gray-300 hover:text-white hover:bg-white/10 relative"
+            onClick={() => setProfilePanelOpen(true)}
+          >
+            <Bell className="w-5 h-5" />
+            {unreadNotifications > 0 && (
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full text-xs font-bold flex items-center justify-center text-white">
+                {unreadNotifications}
+              </span>
+            )}
+          </Button>
+
+          <button
+            onClick={() => setProfilePanelOpen(true)}
+            className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-white/10 transition-colors"
+          >
+            <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg shadow-purple-500/20">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url || "/placeholder.svg"}
+                  alt="Profile"
+                  className="w-full h-full rounded-full object-cover"
+                />
+              ) : (
+                getUserInitials()
+              )}
+            </div>
+          </button>
+        </>
+      )
+    }
+
+    // User is not logged in
+    return (
+      <>
+        <Link href="/login">
+          <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10">
+            Login
+          </Button>
+        </Link>
+        <Link href="/register">
+          <Button className="bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-500 hover:to-cyan-400 text-white border-0 shadow-lg shadow-purple-500/25">
+            Register
+          </Button>
+        </Link>
+      </>
+    )
+  }
 
   return (
     <>
@@ -153,66 +247,7 @@ export default function Navbar() {
             </div>
 
             {/* Right Buttons - Desktop */}
-            <div className="hidden md:flex items-center gap-3">
-              {loading ? (
-                <div className="w-24 h-10 bg-white/5 rounded-md animate-pulse" />
-              ) : user ? (
-                <>
-                  <Link href="/upload">
-                    <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10 gap-2">
-                      <Upload className="w-4 h-4" />
-                      Upload
-                    </Button>
-                  </Link>
-
-                  {/* Notifications Bell */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-gray-300 hover:text-white hover:bg-white/10 relative"
-                    onClick={() => setProfilePanelOpen(true)}
-                  >
-                    <Bell className="w-5 h-5" />
-                    {unreadNotifications > 0 && (
-                      <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full text-xs font-bold flex items-center justify-center text-white">
-                        {unreadNotifications}
-                      </span>
-                    )}
-                  </Button>
-
-                  {/* Avatar Button - Opens Profile Panel */}
-                  <button
-                    onClick={() => setProfilePanelOpen(true)}
-                    className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-white/10 transition-colors"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg shadow-purple-500/20">
-                      {profile?.avatar_url ? (
-                        <img
-                          src={profile.avatar_url || "/placeholder.svg"}
-                          alt="Profile"
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        getUserInitials()
-                      )}
-                    </div>
-                  </button>
-                </>
-              ) : (
-                <>
-                  <Link href="/login">
-                    <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10">
-                      Login
-                    </Button>
-                  </Link>
-                  <Link href="/register">
-                    <Button className="bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-500 hover:to-cyan-400 text-white border-0 shadow-lg shadow-purple-500/25">
-                      Register
-                    </Button>
-                  </Link>
-                </>
-              )}
-            </div>
+            <div className="hidden md:flex items-center gap-3">{renderAuthSection()}</div>
 
             {/* Mobile Menu Button */}
             <button className="md:hidden text-white p-2" onClick={() => setMobileOpen(!mobileOpen)}>
@@ -237,7 +272,7 @@ export default function Navbar() {
                   </Link>
                 ))}
 
-                {user && (
+                {mounted && user && (
                   <>
                     <div className="px-4 py-3 border-t border-white/10">
                       <button
@@ -276,7 +311,7 @@ export default function Navbar() {
                 )}
 
                 <div className="flex gap-4 px-4 pt-4 border-t border-white/10">
-                  {!user && (
+                  {mounted && !user && (
                     <>
                       <Link href="/login" className="flex-1">
                         <Button variant="ghost" className="w-full text-gray-300">

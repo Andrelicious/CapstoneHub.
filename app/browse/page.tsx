@@ -1,139 +1,63 @@
+import { cookies } from "next/headers"
+import { createServerClient } from "@supabase/ssr"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import BrowseCapstones from "@/components/browse-capstones"
 
-const mockCapstones = [
-  {
-    id: "1",
-    title: "AI-Powered Student Attendance System Using Facial Recognition",
-    authors: ["Juan Dela Cruz", "Maria Santos"],
-    year: 2024,
-    category: "Artificial Intelligence",
-    abstract:
-      "This study presents an innovative approach to automating student attendance using deep learning facial recognition technology. The system achieves 98% accuracy in identifying students and reduces attendance taking time by 90%.",
-    keywords: ["AI", "Facial Recognition", "Deep Learning", "Attendance"],
-    pdf_url: "#",
-    thumbnail_url: null,
-    status: "approved",
-    created_at: "2024-03-15",
-  },
-  {
-    id: "2",
-    title: "Blockchain-Based Academic Credential Verification System",
-    authors: ["Pedro Reyes", "Ana Garcia"],
-    year: 2024,
-    category: "Blockchain",
-    abstract:
-      "A decentralized system for verifying academic credentials using blockchain technology to prevent fraud and ensure authenticity of educational documents.",
-    keywords: ["Blockchain", "Verification", "Security", "Credentials"],
-    pdf_url: "#",
-    thumbnail_url: null,
-    status: "approved",
-    created_at: "2024-02-20",
-  },
-  {
-    id: "3",
-    title: "Mobile Learning Management System for K-12 Education",
-    authors: ["Carlo Mendoza"],
-    year: 2023,
-    category: "Mobile Development",
-    abstract:
-      "Development of a comprehensive mobile LMS tailored for K-12 students and teachers in the Philippines, featuring offline support and gamification elements.",
-    keywords: ["Mobile", "LMS", "Education", "K-12"],
-    pdf_url: "#",
-    thumbnail_url: null,
-    status: "approved",
-    created_at: "2023-11-10",
-  },
-  {
-    id: "4",
-    title: "IoT-Based Smart Campus Energy Management",
-    authors: ["Sofia Torres", "Miguel Castro"],
-    year: 2024,
-    category: "Internet of Things",
-    abstract:
-      "An Internet of Things solution for monitoring and optimizing energy consumption across campus facilities, achieving 30% reduction in energy costs.",
-    keywords: ["IoT", "Energy", "Smart Campus", "Sustainability"],
-    pdf_url: "#",
-    thumbnail_url: null,
-    status: "approved",
-    created_at: "2024-01-05",
-  },
-  {
-    id: "5",
-    title: "Natural Language Processing Chatbot for Student Services",
-    authors: ["Elena Cruz", "James Lee"],
-    year: 2023,
-    category: "Artificial Intelligence",
-    abstract:
-      "A conversational AI assistant designed to handle student inquiries and automate common administrative tasks using NLP and machine learning.",
-    keywords: ["NLP", "Chatbot", "AI", "Student Services"],
-    pdf_url: "#",
-    thumbnail_url: null,
-    status: "approved",
-    created_at: "2023-09-20",
-  },
-  {
-    id: "6",
-    title: "Augmented Reality Campus Navigation System",
-    authors: ["Rodel Villanueva"],
-    year: 2024,
-    category: "Augmented Reality",
-    abstract:
-      "An AR-based mobile application that helps students and visitors navigate the campus using real-time visual overlays and indoor positioning.",
-    keywords: ["AR", "Navigation", "Mobile", "Campus"],
-    pdf_url: "#",
-    thumbnail_url: null,
-    status: "approved",
-    created_at: "2024-04-01",
-  },
-  {
-    id: "7",
-    title: "Secure E-Voting System for Student Council Elections",
-    authors: ["Angela Reyes", "Mark Santos"],
-    year: 2023,
-    category: "Cybersecurity",
-    abstract:
-      "A secure and transparent electronic voting system implementing end-to-end encryption and blockchain verification for student council elections.",
-    keywords: ["E-Voting", "Security", "Blockchain", "Elections"],
-    pdf_url: "#",
-    thumbnail_url: null,
-    status: "approved",
-    created_at: "2023-08-15",
-  },
-  {
-    id: "8",
-    title: "Real-Time Traffic Monitoring Using Computer Vision",
-    authors: ["John Paul Cruz", "Mary Grace Tan"],
-    year: 2024,
-    category: "Data Science",
-    abstract:
-      "Implementation of computer vision algorithms for real-time traffic monitoring and congestion prediction in urban areas surrounding the campus.",
-    keywords: ["Computer Vision", "Traffic", "Data Science", "ML"],
-    pdf_url: "#",
-    thumbnail_url: null,
-    status: "approved",
-    created_at: "2024-03-25",
-  },
-]
+async function getApprovedCapstones() {
+  const cookieStore = await cookies()
 
-const categories = [
-  "All Categories",
-  "Artificial Intelligence",
-  "Blockchain",
-  "Mobile Development",
-  "Internet of Things",
-  "Augmented Reality",
-  "Web Development",
-  "Data Science",
-  "Cybersecurity",
-  "Game Development",
-  "Cloud Computing",
-]
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options)
+          })
+        },
+      },
+    },
+  )
 
-const years = ["All Years", "2024", "2023", "2022", "2021", "2020"]
+  // Only fetch approved capstones for public browse
+  const { data: capstones, error } = await supabase
+    .from("capstones")
+    .select("*")
+    .eq("status", "approved")
+    .order("created_at", { ascending: false })
 
-export default function BrowsePage() {
+  if (error) {
+    console.error("Error fetching capstones:", error)
+    return []
+  }
+
+  return capstones || []
+}
+
+function getFiltersFromData(capstones: any[]) {
+  const categoriesSet = new Set<string>()
+  const yearsSet = new Set<string>()
+
+  capstones.forEach((c) => {
+    if (c.category) categoriesSet.add(c.category)
+    if (c.year) yearsSet.add(c.year.toString())
+  })
+
+  const categories = ["All Categories", ...Array.from(categoriesSet).sort()]
+  const years = ["All Years", ...Array.from(yearsSet).sort((a, b) => Number(b) - Number(a))]
+
+  return { categories, years }
+}
+
+export default async function BrowsePage() {
+  const capstones = await getApprovedCapstones()
+  const { categories, years } = getFiltersFromData(capstones)
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
@@ -155,12 +79,12 @@ export default function BrowsePage() {
               </span>
             </h1>
             <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Explore research projects from CCS students and faculty
+              Explore approved research projects from CCS students and faculty
             </p>
           </div>
 
           {/* Client component for search/filter functionality */}
-          <BrowseCapstones initialCapstones={mockCapstones} categories={categories} years={years} />
+          <BrowseCapstones initialCapstones={capstones} categories={categories} years={years} />
         </div>
       </main>
 
