@@ -1,4 +1,3 @@
-"use client"
 import { cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
 import { notFound } from "next/navigation"
@@ -22,11 +21,11 @@ interface Capstone {
 }
 
 interface CapstoneDetailPageProps {
-  params: Promise<{ id: string }>
+  params: { id: string }
 }
 
 async function getCapstone(id: string) {
-  const cookieStore = await cookies()
+  const cookieStore = cookies()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -55,7 +54,7 @@ async function getCapstone(id: string) {
 }
 
 export default async function CapstoneDetailPage({ params }: CapstoneDetailPageProps) {
-  const { id } = await params
+  const { id } = params
   const capstone = await getCapstone(id)
 
   if (!capstone) {
