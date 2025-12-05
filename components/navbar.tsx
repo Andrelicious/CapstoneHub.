@@ -22,7 +22,7 @@ export default function Navbar() {
   const [profilePanelOpen, setProfilePanelOpen] = useState(false)
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
   const pathname = usePathname()
 
@@ -69,8 +69,6 @@ export default function Navbar() {
       setLoading(false)
     }
 
-    // Start loading when checking auth
-    setLoading(true)
     supabase.auth.getUser().then(({ data: { user } }) => {
       fetchUserAndProfile(user)
     })
@@ -118,8 +116,8 @@ export default function Navbar() {
   const unreadNotifications = 2
 
   const renderAuthSection = () => {
-    // During SSR and initial load, show nothing to prevent flash
-    if (!mounted) {
+    // Show login/register buttons during SSR to prevent empty space
+    if (!mounted || loading) {
       return (
         <div className="flex items-center gap-3">
           <Link href="/login">
@@ -134,11 +132,6 @@ export default function Navbar() {
           </Link>
         </div>
       )
-    }
-
-    // Show loading skeleton while checking auth
-    if (loading) {
-      return <div className="w-24 h-10 bg-white/5 rounded-md animate-pulse" />
     }
 
     // User is logged in
@@ -272,7 +265,7 @@ export default function Navbar() {
                   </Link>
                 ))}
 
-                {mounted && user && (
+                {mounted && !loading && user && (
                   <>
                     <div className="px-4 py-3 border-t border-white/10">
                       <button
@@ -311,7 +304,7 @@ export default function Navbar() {
                 )}
 
                 <div className="flex gap-4 px-4 pt-4 border-t border-white/10">
-                  {mounted && !user && (
+                  {mounted && !loading && !user && (
                     <>
                       <Link href="/login" className="flex-1">
                         <Button variant="ghost" className="w-full text-gray-300">

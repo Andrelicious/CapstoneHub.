@@ -1,63 +1,86 @@
 import Link from "next/link"
+import { redirect } from "next/navigation"
+import { cookies } from "next/headers"
+import { createServerClient } from "@supabase/ssr"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  BookOpen,
-  Clock,
-  CheckCircle2,
-  XCircle,
-  Eye,
-  FileText,
-  Users,
-  TrendingUp,
-  Calendar,
-  ArrowRight,
-  Shield,
-  Check,
-  X,
-} from "lucide-react"
+import { BookOpen, Clock, CheckCircle2, XCircle, FileText, Users, TrendingUp, ArrowRight, Shield } from "lucide-react"
+import { FacultyPendingActions } from "@/components/faculty-pending-actions"
 
-// Mock data for pending capstones
-const pendingCapstones = [
-  {
-    id: "1",
-    title: "Machine Learning-Based Crop Disease Detection",
-    author_name: "Maria Santos",
-    category: "Machine Learning",
-    year: 2024,
-    created_at: "2024-04-10",
-  },
-  {
-    id: "2",
-    title: "Augmented Reality Campus Navigation System",
-    author_name: "Juan Dela Cruz",
-    category: "Mobile Development",
-    year: 2024,
-    created_at: "2024-04-08",
-  },
-  {
-    id: "3",
-    title: "Blockchain-Based Academic Credential Verification",
-    author_name: "Ana Reyes",
-    category: "Blockchain",
-    year: 2024,
-    created_at: "2024-04-05",
-  },
-]
+export default async function FacultyDashboardPage() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+          } catch {}
+        },
+      },
+    },
+  )
 
-// Mock stats
-const stats = {
-  totalProjects: 156,
-  pendingReview: pendingCapstones.length,
-  approved: 142,
-  rejected: 11,
-  totalStudents: 1200,
-}
+  // Check authentication
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
-export default function FacultyDashboardPage() {
-  const displayName = "Dr. Rodriguez"
+  if (!user) {
+    redirect("/login")
+  }
+
+  // Get user profile
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+
+  // Check if user is faculty or admin
+  const userRole = profile?.role || user.user_metadata?.role || "student"
+  if (userRole !== "faculty" && userRole !== "admin") {
+    redirect("/student/dashboard")
+  }
+
+  const displayName =
+    profile?.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "Faculty"
+
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const dataSupabase = serviceRoleKey
+    ? createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll() {},
+        },
+      })
+    : supabase
+
+  // Fetch all data
+  const { data: allCapstones } = await dataSupabase
+    .from("capstones")
+    .select("*")
+    .order("created_at", { ascending: false })
+
+  const { data: allProfiles } = await dataSupabase.from("profiles").select("*")
+
+  // Calculate stats from the data
+  const capstonesList = allCapstones || []
+  const pendingCapstones = capstonesList.filter((c) => c.status === "pending")
+  const approvedCapstones = capstonesList.filter((c) => c.status === "approved")
+  const rejectedCapstones = capstonesList.filter((c) => c.status === "rejected")
+  const studentProfiles = (allProfiles || []).filter((p) => p.role === "student")
+
+  const stats = {
+    totalProjects: capstonesList.length,
+    pendingReview: pendingCapstones.length,
+    approved: approvedCapstones.length,
+    rejected: rejectedCapstones.length,
+    totalStudents: studentProfiles.length,
+  }
 
   return (
     <div className="min-h-screen bg-[#0a0612]">
@@ -195,56 +218,15 @@ export default function FacultyDashboardPage() {
               </div>
             </div>
 
-            <div className="space-y-4">
-              {pendingCapstones.map((capstone) => (
-                <div
-                  key={capstone.id}
-                  className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-yellow-500/30 transition-colors"
-                >
-                  <div className="flex-1">
-                    <div className="flex flex-wrap items-center gap-2 mb-2">
-                      <Badge className="bg-yellow-500/20 border-yellow-500/30 text-yellow-400 border">
-                        <Clock className="w-3 h-3 mr-1" />
-                        Pending
-                      </Badge>
-                      <span className="text-xs text-gray-400 flex items-center gap-1">
-                        <Calendar className="w-3 h-3" />
-                        {new Date(capstone.created_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    <h3 className="font-medium text-white mb-1">{capstone.title}</h3>
-                    <p className="text-sm text-gray-400">
-                      By {capstone.author_name} | {capstone.category} | {capstone.year}
-                    </p>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <Link href={`/capstones/${capstone.id}`}>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="bg-white/5 border-white/10 text-white hover:bg-white/10"
-                      >
-                        <Eye className="w-4 h-4 mr-1" />
-                        Review
-                      </Button>
-                    </Link>
-                    <Button size="sm" className="bg-green-600/80 hover:bg-green-600 text-white">
-                      <Check className="w-4 h-4 mr-1" />
-                      Approve
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="bg-red-500/20 border-red-500/30 text-red-400 hover:bg-red-500/30"
-                    >
-                      <X className="w-4 h-4 mr-1" />
-                      Reject
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
+            {pendingCapstones.length === 0 ? (
+              <div className="text-center py-12">
+                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-white mb-2">All caught up!</h3>
+                <p className="text-gray-400">No pending submissions to review</p>
+              </div>
+            ) : (
+              <FacultyPendingActions capstones={pendingCapstones} />
+            )}
           </div>
         </div>
       </main>

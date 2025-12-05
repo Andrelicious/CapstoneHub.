@@ -17,9 +17,7 @@ async function getAdminData() {
         setAll(cookiesToSet) {
           try {
             cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-          } catch {
-            // Ignore errors in Server Components
-          }
+          } catch {}
         },
       },
     },
@@ -38,51 +36,50 @@ async function getAdminData() {
   // Check if user is admin
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  if (profile?.role !== "admin") {
-    return { redirect: "/dashboard" }
+  if (profile?.role !== "admin" && profile?.role !== "faculty") {
+    return { redirect: "/student/dashboard" }
   }
 
-  // Fetch all capstones for stats
-  const { data: allCapstones } = await supabase.from("capstones").select("*").order("created_at", { ascending: false })
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const dataSupabase = serviceRoleKey
+    ? createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll() {},
+        },
+      })
+    : supabase
 
-  // Fetch pending capstones
-  const { data: pendingCapstones } = await supabase
+  // Fetch all capstones
+  const { data: allCapstones } = await dataSupabase
     .from("capstones")
     .select("*")
-    .eq("status", "pending")
     .order("created_at", { ascending: false })
 
-  // Fetch user counts
-  const { count: totalUsers } = await supabase.from("profiles").select("*", { count: "exact", head: true })
-
-  const { count: totalStudents } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "student")
-
-  const { count: totalFaculty } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true })
-    .eq("role", "faculty")
+  // Fetch all profiles
+  const { data: allProfiles } = await dataSupabase.from("profiles").select("*")
 
   const capstones = allCapstones || []
-  const pending = pendingCapstones || []
+  const profiles = allProfiles || []
 
   const stats = {
     total_capstones: capstones.length,
     pending: capstones.filter((c) => c.status === "pending").length,
     approved: capstones.filter((c) => c.status === "approved").length,
     rejected: capstones.filter((c) => c.status === "rejected").length,
-    total_users: totalUsers || 0,
-    total_students: totalStudents || 0,
-    total_faculty: totalFaculty || 0,
+    total_users: profiles.length,
+    total_students: profiles.filter((p) => p.role === "student").length,
+    total_faculty: profiles.filter((p) => p.role === "faculty").length,
   }
 
+  const pendingCapstones = capstones.filter((c) => c.status === "pending")
   const displayName = profile?.display_name || user.email?.split("@")[0] || "Admin"
 
   return {
     stats,
-    pendingCapstones: pending,
+    pendingCapstones,
     displayName,
   }
 }

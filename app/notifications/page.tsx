@@ -3,99 +3,135 @@
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
-import { ArrowLeft, Bell, CheckCircle2, MessageSquare, AlertCircle, FileText, Check, Loader2 } from "lucide-react"
+import { ArrowLeft, Bell, CheckCircle2, XCircle, FileText, Clock, Check, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import Navbar from "@/components/navbar"
 
-const notifications = [
-  {
-    id: "1",
-    icon: CheckCircle2,
-    iconBg: "bg-green-500/20",
-    iconColor: "text-green-400",
-    title: "Capstone Approved",
-    description: "Your project 'AI-Powered Study Assistant' has been approved by the review committee.",
-    time: "2 hours ago",
-    unread: true,
-  },
-  {
-    id: "2",
-    icon: MessageSquare,
-    iconBg: "bg-blue-500/20",
-    iconColor: "text-blue-400",
-    title: "New Comment",
-    description: "Dr. Smith commented on your submission: 'Great work on the methodology section!'",
-    time: "1 day ago",
-    unread: true,
-  },
-  {
-    id: "3",
-    icon: AlertCircle,
-    iconBg: "bg-yellow-500/20",
-    iconColor: "text-yellow-400",
-    title: "Revision Requested",
-    description: "Please update the abstract section of your capstone project with more specific details.",
-    time: "3 days ago",
-    unread: false,
-  },
-  {
-    id: "4",
-    icon: FileText,
-    iconBg: "bg-purple-500/20",
-    iconColor: "text-purple-400",
-    title: "New Capstone Published",
-    description: "A new capstone in your field of interest has been published: 'Machine Learning in Healthcare'",
-    time: "1 week ago",
-    unread: false,
-  },
-]
+interface Notification {
+  id: string
+  type: string
+  title: string
+  description: string
+  reference_id: string | null
+  is_read: boolean
+  target_role: string | null
+  created_at: string
+}
+
+interface Profile {
+  role: string
+  display_name: string
+}
 
 export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
-  const [notificationList, setNotificationList] = useState(notifications)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [userRole, setUserRole] = useState<string>("student")
   const router = useRouter()
   const { toast } = useToast()
 
   useEffect(() => {
-    const checkAuth = async () => {
+    const fetchNotifications = async () => {
       const supabase = createClient()
       const {
         data: { user },
       } = await supabase.auth.getUser()
+
       if (!user) {
         router.push("/login")
         return
       }
+
+      // Get user's role
+      const { data: profile } = await supabase.from("profiles").select("role, display_name").eq("id", user.id).single()
+
+      if (profile) {
+        setUserRole(profile.role || "student")
+      }
+
+      // Fetch notifications - user-specific OR role-based
+      const { data: notifs, error } = await supabase
+        .from("notifications")
+        .select("*")
+        .or(`user_id.eq.${user.id},target_role.eq.${profile?.role || "student"}`)
+        .order("created_at", { ascending: false })
+        .limit(50)
+
+      if (!error && notifs) {
+        setNotifications(notifs)
+      }
+
       setLoading(false)
     }
-    checkAuth()
+
+    fetchNotifications()
   }, [router])
 
-  const markAsRead = (id: string) => {
-    setNotificationList((prev) => prev.map((n) => (n.id === id ? { ...n, unread: false } : n)))
-    toast({
-      title: "Marked as read",
-      description: "Notification marked as read.",
-    })
+  const getIcon = (type: string) => {
+    switch (type) {
+      case "capstone_approved":
+        return { icon: CheckCircle2, color: "text-green-400", bg: "bg-green-500/20" }
+      case "capstone_rejected":
+        return { icon: XCircle, color: "text-red-400", bg: "bg-red-500/20" }
+      case "pending_submission":
+        return { icon: Clock, color: "text-yellow-400", bg: "bg-yellow-500/20" }
+      default:
+        return { icon: FileText, color: "text-cyan-400", bg: "bg-cyan-500/20" }
+    }
   }
 
-  const markAllAsRead = () => {
-    setNotificationList((prev) => prev.map((n) => ({ ...n, unread: false })))
-    toast({
-      title: "All marked as read",
-      description: "All notifications marked as read.",
-    })
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 1) return "Just now"
+    if (diffMins < 60) return `${diffMins} minute${diffMins > 1 ? "s" : ""} ago`
+    if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? "s" : ""} ago`
+    if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? "s" : ""} ago`
+    return date.toLocaleDateString()
   }
 
-  const unreadCount = notificationList.filter((n) => n.unread).length
+  const markAsRead = async (id: string) => {
+    const supabase = createClient()
+    await supabase.from("notifications").update({ is_read: true }).eq("id", id)
+
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
+  }
+
+  const markAllAsRead = async () => {
+    const supabase = createClient()
+    const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id)
+
+    if (unreadIds.length > 0) {
+      await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds)
+
+      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+
+      toast({
+        title: "All marked as read",
+        description: "All notifications have been marked as read.",
+      })
+    }
+  }
+
+  const getDashboardLink = () => {
+    if (userRole === "admin") return "/admin/dashboard"
+    if (userRole === "faculty") return "/faculty/dashboard"
+    return "/student/dashboard"
+  }
+
+  const unreadCount = notifications.filter((n) => !n.is_read).length
 
   if (loading) {
     return (
       <div className="min-h-screen bg-[#0a0612] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+        <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
       </div>
     )
   }
@@ -106,7 +142,7 @@ export default function NotificationsPage() {
       <div className="pt-24 pb-12 px-6">
         <div className="max-w-3xl mx-auto">
           <Link
-            href="/student/dashboard"
+            href={getDashboardLink()}
             className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
@@ -115,12 +151,14 @@ export default function NotificationsPage() {
 
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full bg-purple-500/20 flex items-center justify-center">
-                <Bell className="w-6 h-6 text-purple-400" />
+              <div className="w-12 h-12 rounded-full bg-cyan-500/20 flex items-center justify-center">
+                <Bell className="w-6 h-6 text-cyan-400" />
               </div>
               <div>
                 <h1 className="text-3xl font-bold text-white">Notifications</h1>
-                <p className="text-gray-400">{unreadCount} unread notifications</p>
+                <p className="text-gray-400">
+                  {unreadCount} unread notification{unreadCount !== 1 ? "s" : ""}
+                </p>
               </div>
             </div>
             {unreadCount > 0 && (
@@ -135,48 +173,51 @@ export default function NotificationsPage() {
             )}
           </div>
 
-          <div className="space-y-3">
-            {notificationList.map((notification) => (
-              <Card
-                key={notification.id}
-                className={`bg-[#1a1625]/80 border-white/10 transition-all hover:bg-[#1a1625] cursor-pointer ${
-                  notification.unread ? "border-l-2 border-l-purple-500" : ""
-                }`}
-                onClick={() => markAsRead(notification.id)}
-              >
-                <CardContent className="p-4">
+          <div className="space-y-2">
+            {notifications.map((notification) => {
+              const { icon: Icon, color, bg } = getIcon(notification.type)
+              return (
+                <div
+                  key={notification.id}
+                  onClick={() => markAsRead(notification.id)}
+                  className={`p-4 rounded-xl cursor-pointer transition-all ${
+                    notification.is_read
+                      ? "bg-white/5 hover:bg-white/10"
+                      : "bg-gradient-to-r from-cyan-500/10 to-purple-500/10 hover:from-cyan-500/15 hover:to-purple-500/15"
+                  }`}
+                >
                   <div className="flex items-start gap-4">
-                    <div className={`p-3 rounded-full ${notification.iconBg}`}>
-                      <notification.icon className={`w-5 h-5 ${notification.iconColor}`} />
+                    <div className={`p-2.5 rounded-xl ${bg}`}>
+                      <Icon className={`w-5 h-5 ${color}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <h3 className={`font-semibold ${notification.unread ? "text-white" : "text-gray-400"}`}>
+                          <h3 className={`font-semibold ${notification.is_read ? "text-gray-400" : "text-white"}`}>
                             {notification.title}
                           </h3>
-                          <p className="text-sm text-gray-400 mt-1">{notification.description}</p>
+                          <p className="text-sm text-gray-400 mt-1 line-clamp-2">{notification.description}</p>
                         </div>
-                        {notification.unread && (
-                          <div className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0 mt-1" />
+                        {!notification.is_read && (
+                          <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 flex-shrink-0 mt-2" />
                         )}
                       </div>
-                      <p className="text-xs text-gray-500 mt-2">{notification.time}</p>
+                      <p className="text-xs text-gray-500 mt-2">{formatTime(notification.created_at)}</p>
                     </div>
                   </div>
-                </CardContent>
-              </Card>
-            ))}
+                </div>
+              )
+            })}
           </div>
 
-          {notificationList.length === 0 && (
-            <Card className="bg-[#1a1625]/80 border-white/10">
-              <CardContent className="text-center py-12">
-                <Bell className="w-12 h-12 text-gray-500 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-white">No notifications</h3>
-                <p className="text-gray-400 mt-1">You're all caught up!</p>
-              </CardContent>
-            </Card>
+          {notifications.length === 0 && (
+            <div className="bg-white/5 rounded-xl p-12 text-center">
+              <div className="w-16 h-16 rounded-full bg-cyan-500/20 flex items-center justify-center mx-auto mb-4">
+                <Bell className="w-8 h-8 text-cyan-400" />
+              </div>
+              <h3 className="text-lg font-semibold text-white">No notifications yet</h3>
+              <p className="text-gray-400 mt-1">You're all caught up!</p>
+            </div>
           )}
         </div>
       </div>
