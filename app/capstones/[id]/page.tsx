@@ -5,27 +5,12 @@ import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import CapstoneDetailClient from "@/components/capstone-detail-client"
 
-interface Capstone {
-  id: string
-  title: string
-  abstract: string
-  authors: string[]
-  year: number
-  program: string
-  adviser: string
-  category: string
-  keywords: string[]
-  pdf_url: string
-  status: "pending" | "approved" | "rejected"
-  created_at: string
-}
-
 interface CapstoneDetailPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
 async function getCapstone(id: string) {
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -36,15 +21,42 @@ async function getCapstone(id: string) {
           return cookieStore.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => {
+              cookieStore.set(name, value, options)
+            })
+          } catch {}
         },
       },
     },
   )
 
-  const { data: capstone, error } = await supabase.from("capstones").select("*").eq("id", id).single()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  let dataSupabase = supabase
+
+  if (user) {
+    const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+
+    // If user is faculty or admin, use service role to bypass RLS
+    if (profile?.role === "faculty" || profile?.role === "admin") {
+      const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+      if (serviceRoleKey) {
+        dataSupabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
+          cookies: {
+            getAll() {
+              return cookieStore.getAll()
+            },
+            setAll() {},
+          },
+        })
+      }
+    }
+  }
+
+  const { data: capstone, error } = await dataSupabase.from("capstones").select("*").eq("id", id).single()
 
   if (error || !capstone) {
     return null
@@ -54,7 +66,7 @@ async function getCapstone(id: string) {
 }
 
 export default async function CapstoneDetailPage({ params }: CapstoneDetailPageProps) {
-  const { id } = params
+  const { id } = await params
   const capstone = await getCapstone(id)
 
   if (!capstone) {

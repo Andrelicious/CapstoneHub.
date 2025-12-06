@@ -107,114 +107,116 @@ export default async function FacultyDashboardPage() {
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[150px]" />
       </div>
 
-      <main className="relative pt-32 pb-20">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+      <main className="relative pt-24 md:pt-32 pb-20">
+        <div className="max-w-7xl mx-auto px-4 md:px-6 lg:px-8">
           {/* Welcome Header */}
-          <div className="mb-10">
+          <div className="mb-8 md:mb-10">
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-cyan-600 flex items-center justify-center">
-                <Shield className="w-6 h-6 text-white" />
+              <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-gradient-to-br from-purple-600 to-cyan-600 flex items-center justify-center">
+                <Shield className="w-4 h-4 md:w-6 md:h-6 text-white" />
               </div>
               <div>
                 <p className="text-sm text-purple-400">{dashboardTitle}</p>
                 <p className="text-xs text-gray-500">Review & Management</p>
               </div>
             </div>
-            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
+            <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-2">
               Welcome back,{" "}
               <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
                 {displayName}
               </span>
             </h1>
-            <p className="text-gray-400 text-lg">Review student submissions and manage the capstone repository</p>
+            <p className="text-gray-400 text-base md:text-lg">
+              Review student submissions and manage the capstone repository
+            </p>
           </div>
 
           {/* Stats Cards */}
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-10">
-            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
-                  <FileText className="w-5 h-5 text-purple-400" />
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 md:gap-4 mb-8 md:mb-10">
+            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-4 md:p-5">
+              <div className="flex flex-col gap-2 mb-2 md:mb-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-purple-500/20 flex items-center justify-center">
+                  <FileText className="w-4 h-4 md:w-5 md:h-5 text-purple-400" />
                 </div>
-                <span className="text-gray-400 text-sm">Total Projects</span>
+                <span className="text-gray-400 text-xs md:text-sm">Total Projects</span>
               </div>
-              <p className="text-3xl font-bold text-white">{stats.totalProjects}</p>
+              <p className="text-2xl md:text-3xl font-bold text-white">{stats.totalProjects}</p>
             </div>
 
-            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-yellow-500/30 p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-yellow-400" />
+            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-yellow-500/30 p-4 md:p-5">
+              <div className="flex flex-col gap-2 mb-2 md:mb-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                  <Clock className="w-4 h-4 md:w-5 md:h-5 text-yellow-400" />
                 </div>
-                <span className="text-gray-400 text-sm">Pending Review</span>
+                <span className="text-gray-400 text-xs md:text-sm">Pending Review</span>
               </div>
-              <p className="text-3xl font-bold text-yellow-400">{stats.pendingReview}</p>
+              <p className="text-2xl md:text-3xl font-bold text-yellow-400">{stats.pendingReview}</p>
             </div>
 
-            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
-                  <CheckCircle2 className="w-5 h-5 text-green-400" />
+            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-4 md:p-5">
+              <div className="flex flex-col gap-2 mb-2 md:mb-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-green-500/20 flex items-center justify-center">
+                  <CheckCircle2 className="w-4 h-4 md:w-5 md:h-5 text-green-400" />
                 </div>
-                <span className="text-gray-400 text-sm">Approved</span>
+                <span className="text-gray-400 text-xs md:text-sm">Approved</span>
               </div>
-              <p className="text-3xl font-bold text-white">{stats.approved}</p>
+              <p className="text-2xl md:text-3xl font-bold text-white">{stats.approved}</p>
             </div>
 
-            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
-                  <XCircle className="w-5 h-5 text-red-400" />
+            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-4 md:p-5">
+              <div className="flex flex-col gap-2 mb-2 md:mb-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-red-500/20 flex items-center justify-center">
+                  <XCircle className="w-4 h-4 md:w-5 md:h-5 text-red-400" />
                 </div>
-                <span className="text-gray-400 text-sm">Rejected</span>
+                <span className="text-gray-400 text-xs md:text-sm">Rejected</span>
               </div>
-              <p className="text-3xl font-bold text-white">{stats.rejected}</p>
+              <p className="text-2xl md:text-3xl font-bold text-white">{stats.rejected}</p>
             </div>
 
-            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-5">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-10 h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
-                  <Users className="w-5 h-5 text-cyan-400" />
+            <div className="rounded-xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-4 md:p-5 col-span-2 sm:col-span-1">
+              <div className="flex flex-col gap-2 mb-2 md:mb-3">
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-lg bg-cyan-500/20 flex items-center justify-center">
+                  <Users className="w-4 h-4 md:w-5 md:h-5 text-cyan-400" />
                 </div>
-                <span className="text-gray-400 text-sm">Students</span>
+                <span className="text-gray-400 text-xs md:text-sm">Students</span>
               </div>
-              <p className="text-3xl font-bold text-white">{stats.totalStudents}</p>
+              <p className="text-2xl md:text-3xl font-bold text-white">{stats.totalStudents}</p>
             </div>
           </div>
 
           {/* Quick Actions */}
-          <div className="grid md:grid-cols-2 gap-6 mb-10">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 mb-8 md:mb-10">
             <a href="/browse" className="block">
-              <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6 hover:border-purple-500/50 transition-all duration-300 cursor-pointer">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <BookOpen className="w-7 h-7 text-white" />
+              <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-4 md:p-6 hover:border-purple-500/50 transition-all duration-300 cursor-pointer">
+                <div className="flex items-center gap-3 md:gap-4">
+                  <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                    <BookOpen className="w-6 h-6 md:w-7 md:h-7 text-white" />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-white group-hover:text-purple-300 transition-colors">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-lg md:text-xl font-semibold text-white group-hover:text-purple-300 transition-colors">
                       Browse All Projects
                     </h3>
-                    <p className="text-gray-400">View the complete capstone repository</p>
+                    <p className="text-gray-400 text-sm md:text-base">View the complete capstone repository</p>
                   </div>
-                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
+                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-400 group-hover:translate-x-1 transition-all flex-shrink-0" />
                 </div>
               </div>
             </a>
 
             {isAdmin && (
               <a href="/admin/dashboard" className="block">
-                <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6 hover:border-cyan-500/50 transition-all duration-300 cursor-pointer">
-                  <div className="flex items-center gap-4">
-                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                      <TrendingUp className="w-7 h-7 text-white" />
+                <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-4 md:p-6 hover:border-cyan-500/50 transition-all duration-300 cursor-pointer">
+                  <div className="flex items-center gap-3 md:gap-4">
+                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
+                      <TrendingUp className="w-6 h-6 md:w-7 md:h-7 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-white group-hover:text-cyan-300 transition-colors">
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-lg md:text-xl font-semibold text-white group-hover:text-cyan-300 transition-colors">
                         Admin Panel
                       </h3>
-                      <p className="text-gray-400">Full management controls</p>
+                      <p className="text-gray-400 text-sm md:text-base">Full management controls</p>
                     </div>
-                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
+                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all flex-shrink-0" />
                   </div>
                 </div>
               </a>
@@ -222,24 +224,26 @@ export default async function FacultyDashboardPage() {
           </div>
 
           {/* Pending Submissions */}
-          <div className="rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6">
-            <div className="flex items-center justify-between mb-6">
+          <div className="rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-4 md:p-6">
+            <div className="flex items-center justify-between mb-4 md:mb-6">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-yellow-600 to-orange-600 flex items-center justify-center">
-                  <Clock className="w-5 h-5 text-white" />
+                <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-gradient-to-br from-yellow-600 to-orange-600 flex items-center justify-center">
+                  <Clock className="w-4 h-4 md:w-5 md:h-5 text-white" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-semibold text-white">Pending Review</h2>
-                  <p className="text-sm text-gray-400">{pendingCapstones.length} submissions awaiting review</p>
+                  <h2 className="text-lg md:text-xl font-semibold text-white">Pending Review</h2>
+                  <p className="text-xs md:text-sm text-gray-400">
+                    {pendingCapstones.length} submissions awaiting review
+                  </p>
                 </div>
               </div>
             </div>
 
             {pendingCapstones.length === 0 ? (
-              <div className="text-center py-12">
-                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-white mb-2">All caught up!</h3>
-                <p className="text-gray-400">No pending submissions to review</p>
+              <div className="text-center py-8 md:py-12">
+                <CheckCircle2 className="w-10 h-10 md:w-12 md:h-12 text-green-500 mx-auto mb-4" />
+                <h3 className="text-base md:text-lg font-medium text-white mb-2">All caught up!</h3>
+                <p className="text-gray-400 text-sm md:text-base">No pending submissions to review</p>
               </div>
             ) : (
               <FacultyPendingActions capstones={pendingCapstones} />

@@ -3,7 +3,6 @@
 import type React from "react"
 
 import { useState, useRef } from "react"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar, Eye, Check, X, Loader2 } from "lucide-react"
@@ -28,7 +27,6 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
   const [capstones, setCapstones] = useState(initialCapstones)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
-  const router = useRouter()
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
   const getSupabase = () => {
@@ -71,6 +69,10 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
     setProcessingId(null)
   }
 
+  const handleView = (capstoneId: string) => {
+    window.location.href = `/capstones/${capstoneId}`
+  }
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString("en-US", {
       month: "short",
@@ -89,7 +91,7 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       {actionMessage && (
         <div
           className={`p-3 rounded-lg text-sm ${
@@ -105,29 +107,29 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
       {capstones.map((capstone) => (
         <div
           key={capstone.id}
-          className="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300"
+          className="group p-3 md:p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300"
         >
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex flex-col gap-3 md:gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-400">
+                <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-400 whitespace-nowrap">
                   {capstone.category}
                 </Badge>
-                <span className="text-xs text-gray-500 flex items-center gap-1">
+                <span className="text-xs text-gray-500 flex items-center gap-1 whitespace-nowrap">
                   <Calendar className="w-3 h-3" />
                   {capstone.year}
                 </span>
-                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 whitespace-nowrap">
                   <Clock className="w-3 h-3 mr-1" />
                   Pending
                 </Badge>
               </div>
 
-              <h4 className="font-semibold text-white group-hover:text-purple-300 transition-colors truncate">
+              <h4 className="font-semibold text-white group-hover:text-purple-300 transition-colors text-sm md:text-base line-clamp-2">
                 {capstone.title}
               </h4>
 
-              <p className="text-sm text-gray-400 mt-1">
+              <p className="text-xs md:text-sm text-gray-400 mt-1 truncate">
                 {capstone.authors?.join(", ") || "No authors"} • Submitted {formatDate(capstone.created_at)}
               </p>
             </div>
@@ -136,8 +138,8 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => router.push(`/capstones/${capstone.id}`)}
-                className="text-gray-400 hover:text-white hover:bg-white/10"
+                onClick={() => handleView(capstone.id)}
+                className="text-gray-400 hover:text-white hover:bg-white/10 flex-1 md:flex-none"
               >
                 <Eye className="w-4 h-4 mr-1" />
                 View
@@ -148,7 +150,7 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
                 size="sm"
                 onClick={(e) => handleUpdateStatus(e, capstone, "approved")}
                 disabled={processingId === capstone.id}
-                className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                className="text-green-400 hover:text-green-300 hover:bg-green-500/10 flex-1 md:flex-none"
               >
                 {processingId === capstone.id ? (
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -165,7 +167,7 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
                 size="sm"
                 onClick={(e) => handleUpdateStatus(e, capstone, "rejected")}
                 disabled={processingId === capstone.id}
-                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10 flex-1 md:flex-none"
               >
                 {processingId === capstone.id ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

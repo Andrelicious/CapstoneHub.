@@ -131,7 +131,10 @@ export default function HeroSection() {
           </div>
 
           {/* Right Side - Abstract Shapes */}
-          <div className="relative hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000 delay-300">
+          <div
+            className="relative hidden lg:block animate-in fade-in slide-in-from-right-8 duration-1000"
+            style={{ animationDelay: "300ms" }}
+          >
             <AbstractShapes />
           </div>
         </div>
