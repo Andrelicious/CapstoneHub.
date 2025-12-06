@@ -1,12 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Bell, CheckCircle2, XCircle, FileText, Clock, Check, Loader2 } from "lucide-react"
+import { ArrowLeft, Bell, CheckCircle2, XCircle, FileText, Clock, Check, Loader2, X } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useToast } from "@/hooks/use-toast"
-import Link from "next/link"
 import Navbar from "@/components/navbar"
 
 interface Notification {
@@ -20,17 +18,52 @@ interface Notification {
   created_at: string
 }
 
-interface Profile {
-  role: string
-  display_name: string
+interface ToastData {
+  type: "success" | "error"
+  title: string
+  description: string
+}
+
+function GlassToast({ toast, onClose }: { toast: ToastData; onClose: () => void }) {
+  useEffect(() => {
+    const timer = setTimeout(onClose, 4000)
+    return () => clearTimeout(timer)
+  }, [onClose])
+
+  return (
+    <div className="fixed bottom-6 right-6 max-w-sm rounded-xl bg-black/60 border border-white/10 backdrop-blur-xl shadow-lg shadow-purple-500/30 px-4 py-3 flex items-start gap-3 text-sm text-gray-100 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+      <div
+        className={`mt-0.5 h-8 w-8 rounded-full flex items-center justify-center text-white text-lg flex-shrink-0 ${
+          toast.type === "success"
+            ? "bg-gradient-to-br from-purple-500 to-cyan-400"
+            : "bg-gradient-to-br from-red-500 to-orange-400"
+        }`}
+      >
+        {toast.type === "success" ? <Check className="w-4 h-4" /> : <X className="w-4 h-4" />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold">{toast.title}</p>
+        <p className="text-xs text-gray-300 mt-0.5">{toast.description}</p>
+      </div>
+      <button onClick={onClose} className="ml-2 text-gray-400 hover:text-gray-100 transition-colors flex-shrink-0">
+        <X className="w-4 h-4" />
+      </button>
+    </div>
+  )
 }
 
 export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [userRole, setUserRole] = useState<string>("student")
+  const [markingAll, setMarkingAll] = useState(false)
+  const [markingIds, setMarkingIds] = useState<Set<string>>(new Set())
+  const [toast, setToast] = useState<ToastData | null>(null)
   const router = useRouter()
-  const { toast } = useToast()
+
+  const showToast = useCallback((type: "success" | "error", title: string, description: string) => {
+    setToast({ type, title, description })
+  }, [])
 
   useEffect(() => {
     const fetchNotifications = async () => {
@@ -44,14 +77,12 @@ export default function NotificationsPage() {
         return
       }
 
-      // Get user's role
       const { data: profile } = await supabase.from("profiles").select("role, display_name").eq("id", user.id).single()
 
       if (profile) {
         setUserRole(profile.role || "student")
       }
 
-      // Fetch notifications - user-specific OR role-based
       const { data: notifs, error } = await supabase
         .from("notifications")
         .select("*")
@@ -98,32 +129,63 @@ export default function NotificationsPage() {
   }
 
   const markAsRead = async (id: string) => {
-    const supabase = createClient()
-    await supabase.from("notifications").update({ is_read: true }).eq("id", id)
+    if (markingIds.has(id)) return
 
+    // Optimistically update UI immediately
+    const previous = notifications
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
+    setMarkingIds((prev) => new Set(prev).add(id))
+
+    const supabase = createClient()
+    const { error } = await supabase.from("notifications").update({ is_read: true }).eq("id", id)
+
+    if (error) {
+      // Rollback on error
+      setNotifications(previous)
+      showToast("error", "Failed to update", "Could not mark notification as read.")
+    }
+
+    setMarkingIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
   }
 
   const markAllAsRead = async () => {
-    const supabase = createClient()
+    if (markingAll) return
+
     const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id)
+    if (unreadIds.length === 0) return
 
-    if (unreadIds.length > 0) {
-      await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds)
+    setMarkingAll(true)
 
-      setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
+    // Optimistically update UI immediately
+    const previous = notifications
+    setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
 
-      toast({
-        title: "All marked as read",
-        description: "All notifications have been marked as read.",
-      })
+    const supabase = createClient()
+    const { error } = await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds)
+
+    if (error) {
+      // Rollback on error
+      setNotifications(previous)
+      showToast("error", "Failed to update", "Could not mark notifications as read.")
+    } else {
+      showToast("success", "All marked as read", "All notifications have been successfully updated.")
     }
+
+    setMarkingAll(false)
   }
 
-  const getDashboardLink = () => {
-    if (userRole === "admin") return "/admin/dashboard"
-    if (userRole === "faculty") return "/faculty/dashboard"
-    return "/student/dashboard"
+  const handleBackToDashboard = () => {
+    if (userRole === "admin") {
+      router.push("/admin/dashboard")
+    } else if (userRole === "faculty") {
+      router.push("/faculty/dashboard")
+    } else {
+      router.push("/student/dashboard")
+    }
   }
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
@@ -141,13 +203,13 @@ export default function NotificationsPage() {
       <Navbar />
       <div className="pt-24 pb-12 px-6">
         <div className="max-w-3xl mx-auto">
-          <Link
-            href={getDashboardLink()}
+          <button
+            onClick={handleBackToDashboard}
             className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
-          </Link>
+          </button>
 
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">
@@ -165,10 +227,11 @@ export default function NotificationsPage() {
               <Button
                 variant="outline"
                 onClick={markAllAsRead}
-                className="bg-white/5 border-white/10 text-white hover:bg-white/10 gap-2"
+                disabled={markingAll}
+                className="bg-white/5 border-white/10 text-white hover:bg-white/10 gap-2 disabled:opacity-50"
               >
-                <Check className="w-4 h-4" />
-                Mark all as read
+                {markingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                {markingAll ? "Updating..." : "Mark all as read"}
               </Button>
             )}
           </div>
@@ -176,15 +239,17 @@ export default function NotificationsPage() {
           <div className="space-y-2">
             {notifications.map((notification) => {
               const { icon: Icon, color, bg } = getIcon(notification.type)
+              const isMarking = markingIds.has(notification.id)
               return (
-                <div
+                <button
                   key={notification.id}
-                  onClick={() => markAsRead(notification.id)}
-                  className={`p-4 rounded-xl cursor-pointer transition-all ${
+                  onClick={() => !notification.is_read && markAsRead(notification.id)}
+                  disabled={isMarking}
+                  className={`w-full text-left p-4 rounded-xl transition-all ${
                     notification.is_read
                       ? "bg-white/5 hover:bg-white/10"
                       : "bg-gradient-to-r from-cyan-500/10 to-purple-500/10 hover:from-cyan-500/15 hover:to-purple-500/15"
-                  }`}
+                  } ${isMarking ? "opacity-70" : ""}`}
                 >
                   <div className="flex items-start gap-4">
                     <div className={`p-2.5 rounded-xl ${bg}`}>
@@ -205,7 +270,7 @@ export default function NotificationsPage() {
                       <p className="text-xs text-gray-500 mt-2">{formatTime(notification.created_at)}</p>
                     </div>
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -221,6 +286,8 @@ export default function NotificationsPage() {
           )}
         </div>
       </div>
+
+      {toast && <GlassToast toast={toast} onClose={() => setToast(null)} />}
     </div>
   )
 }

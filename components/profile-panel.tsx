@@ -12,8 +12,10 @@ import {
   LogOut,
   Bell,
   CheckCircle2,
-  MessageSquare,
-  AlertCircle,
+  Clock,
+  XCircle,
+  FileText,
+  Loader2,
 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
@@ -33,39 +35,86 @@ interface ProfilePanelProps {
   profile: UserProfile | null
 }
 
-// Dummy notifications for MVP
-const dummyNotifications = [
-  {
-    id: "1",
-    icon: CheckCircle2,
-    title: "Capstone Approved",
-    description: "Your project 'AI-Powered Study Assistant' has been approved",
-    time: "2 hours ago",
-    unread: true,
-  },
-  {
-    id: "2",
-    icon: MessageSquare,
-    title: "New Comment",
-    description: "Dr. Smith commented on your submission",
-    time: "1 day ago",
-    unread: true,
-  },
-  {
-    id: "3",
-    icon: AlertCircle,
-    title: "Revision Requested",
-    description: "Please update the abstract section",
-    time: "3 days ago",
-    unread: false,
-  },
-]
+interface Notification {
+  id: string
+  type: string
+  title: string
+  message: string
+  is_read: boolean
+  created_at: string
+}
 
 export default function ProfilePanel({ isOpen, onClose, user, profile }: ProfilePanelProps) {
   const router = useRouter()
   const { toast } = useToast()
   const panelRef = useRef<HTMLDivElement>(null)
   const [signingOut, setSigningOut] = useState(false)
+  const [notifications, setNotifications] = useState<Notification[]>([])
+  const [loadingNotifications, setLoadingNotifications] = useState(false)
+
+  useEffect(() => {
+    if (!isOpen || !user) return
+
+    const fetchNotifications = async () => {
+      setLoadingNotifications(true)
+      const supabase = createClient()
+
+      try {
+        // For admin/faculty: show pending submissions as notifications
+        if (profile?.role === "admin" || profile?.role === "faculty") {
+          const { data: pendingCapstones } = await supabase
+            .from("capstones")
+            .select("id, title, created_at, status")
+            .eq("status", "pending")
+            .order("created_at", { ascending: false })
+            .limit(5)
+
+          if (pendingCapstones) {
+            const notifs: Notification[] = pendingCapstones.map((c) => ({
+              id: c.id,
+              type: "pending_submission",
+              title: "New Submission",
+              message: `"${c.title}" is awaiting review`,
+              is_read: false,
+              created_at: c.created_at,
+            }))
+            setNotifications(notifs)
+          }
+        } else {
+          // For students: show their capstone status updates
+          const { data: userCapstones } = await supabase
+            .from("capstones")
+            .select("id, title, status, created_at, updated_at")
+            .eq("uploader_id", user.id)
+            .order("updated_at", { ascending: false })
+            .limit(5)
+
+          if (userCapstones) {
+            const notifs: Notification[] = userCapstones.map((c) => ({
+              id: c.id,
+              type: c.status === "approved" ? "approved" : c.status === "rejected" ? "rejected" : "pending",
+              title:
+                c.status === "approved"
+                  ? "Capstone Approved"
+                  : c.status === "rejected"
+                    ? "Capstone Rejected"
+                    : "Submission Pending",
+              message: `"${c.title}" ${c.status === "approved" ? "has been approved" : c.status === "rejected" ? "was rejected" : "is awaiting review"}`,
+              is_read: false,
+              created_at: c.updated_at || c.created_at,
+            }))
+            setNotifications(notifs)
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching notifications:", error)
+      } finally {
+        setLoadingNotifications(false)
+      }
+    }
+
+    fetchNotifications()
+  }, [isOpen, user, profile?.role])
 
   // Close on Escape key
   useEffect(() => {
@@ -122,21 +171,64 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
       description: "You have been signed out successfully.",
     })
     onClose()
-    window.location.href = "/"
+    router.replace("/")
+    router.refresh()
   }
 
   const handleNavigation = (path: string) => {
     onClose()
-    window.location.href = path
+    router.push(path)
   }
 
-  const handleNotificationClick = (id: string) => {
-    toast({
-      title: "Notification",
-      description: `Viewing notification ${id}`,
-    })
-    router.push("/notifications")
+  const handleNotificationClick = (notification: Notification) => {
     onClose()
+    if (notification.type === "pending_submission") {
+      router.push(`/capstones/${notification.id}`)
+    } else {
+      router.push(`/capstones/${notification.id}`)
+    }
+  }
+
+  const getNotificationIcon = (type: string) => {
+    switch (type) {
+      case "approved":
+        return CheckCircle2
+      case "rejected":
+        return XCircle
+      case "pending":
+      case "pending_submission":
+        return Clock
+      default:
+        return FileText
+    }
+  }
+
+  const getNotificationColor = (type: string) => {
+    switch (type) {
+      case "approved":
+        return "bg-green-500/20 text-green-400"
+      case "rejected":
+        return "bg-red-500/20 text-red-400"
+      case "pending":
+      case "pending_submission":
+        return "bg-yellow-500/20 text-yellow-400"
+      default:
+        return "bg-purple-500/20 text-purple-400"
+    }
+  }
+
+  const formatTimeAgo = (dateString: string) => {
+    const date = new Date(dateString)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+
+    if (diffMins < 60) return `${diffMins} min ago`
+    if (diffHours < 24) return `${diffHours} hours ago`
+    if (diffDays < 7) return `${diffDays} days ago`
+    return date.toLocaleDateString()
   }
 
   const menuItems = [
@@ -243,7 +335,9 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 text-gray-400">
                 <Bell className="w-4 h-4" />
-                <span className="text-sm font-medium">Your notifications</span>
+                <span className="text-sm font-medium">
+                  {profile?.role === "admin" || profile?.role === "faculty" ? "Pending Reviews" : "Your Submissions"}
+                </span>
               </div>
               <button
                 onClick={() => handleNavigation("/notifications")}
@@ -254,29 +348,38 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
             </div>
 
             <div className="space-y-2">
-              {dummyNotifications.map((notification) => (
-                <button
-                  key={notification.id}
-                  onClick={() => handleNotificationClick(notification.id)}
-                  className="w-full flex items-start gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 text-left group"
-                >
-                  <div
-                    className={`p-2 rounded-full ${
-                      notification.unread ? "bg-purple-500/20 text-purple-400" : "bg-gray-500/20 text-gray-400"
-                    }`}
-                  >
-                    <notification.icon className="w-4 h-4" />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={`text-sm font-medium ${notification.unread ? "text-white" : "text-gray-400"}`}>
-                      {notification.title}
-                    </p>
-                    <p className="text-xs text-gray-500 truncate">{notification.description}</p>
-                    <p className="text-xs text-gray-600 mt-1">{notification.time}</p>
-                  </div>
-                  {notification.unread && <div className="w-2 h-2 rounded-full bg-purple-500 mt-2" />}
-                </button>
-              ))}
+              {loadingNotifications ? (
+                <div className="flex items-center justify-center py-4">
+                  <Loader2 className="w-5 h-5 animate-spin text-purple-400" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-center py-4 text-gray-500 text-sm">
+                  {profile?.role === "admin" || profile?.role === "faculty"
+                    ? "No pending submissions"
+                    : "No submissions yet"}
+                </div>
+              ) : (
+                notifications.map((notification) => {
+                  const Icon = getNotificationIcon(notification.type)
+                  return (
+                    <button
+                      key={notification.id}
+                      onClick={() => handleNotificationClick(notification)}
+                      className="w-full flex items-start gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 text-left group"
+                    >
+                      <div className={`p-2 rounded-full ${getNotificationColor(notification.type)}`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium text-white">{notification.title}</p>
+                        <p className="text-xs text-gray-500 truncate">{notification.message}</p>
+                        <p className="text-xs text-gray-600 mt-1">{formatTimeAgo(notification.created_at)}</p>
+                      </div>
+                      {!notification.is_read && <div className="w-2 h-2 rounded-full bg-purple-500 mt-2" />}
+                    </button>
+                  )
+                })
+              )}
             </div>
           </div>
         </div>
@@ -289,7 +392,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
             disabled={signingOut}
             className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-500/10"
           >
-            <LogOut className="w-5 h-5" />
+            {signingOut ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
             {signingOut ? "Signing out..." : "Sign Out"}
           </Button>
         </div>

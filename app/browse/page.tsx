@@ -24,7 +24,6 @@ async function getApprovedCapstones() {
     },
   )
 
-  // Only fetch approved capstones for public browse
   const { data: capstones, error } = await supabase
     .from("capstones")
     .select("*")
@@ -59,13 +58,13 @@ export default async function BrowsePage() {
   const { categories, years } = getFiltersFromData(capstones)
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#0a0612]">
       <Navbar />
 
-      {/* Background effects */}
+      {/* Background effects - more subtle */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px]" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[150px]" />
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/5 rounded-full blur-[150px]" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/5 rounded-full blur-[150px]" />
       </div>
 
       <main className="relative pt-32 pb-20">
@@ -74,16 +73,15 @@ export default async function BrowsePage() {
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
               Browse{" "}
-              <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
+              <span className="bg-gradient-to-r from-cyan-400 to-blue-500 bg-clip-text text-transparent">
                 Capstone Projects
               </span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
+            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
               Explore approved research projects from CCS students and faculty
             </p>
           </div>
 
-          {/* Client component for search/filter functionality */}
           <BrowseCapstones initialCapstones={capstones} categories={categories} years={years} />
         </div>
       </main>

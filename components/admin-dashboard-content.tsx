@@ -1,5 +1,7 @@
 "use client"
 
+import type React from "react"
+
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import {
@@ -16,11 +18,12 @@ import {
   Eye,
   Check,
   X,
+  Loader2,
 } from "lucide-react"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useState } from "react"
 import {
   Dialog,
@@ -31,6 +34,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/hooks/use-toast"
+
+const supabase = createClient()
 
 interface Stats {
   total_capstones: number
@@ -66,24 +72,64 @@ export default function AdminDashboardContent({
 }: AdminDashboardContentProps) {
   const [pendingCapstones, setPendingCapstones] = useState(initialPending)
   const [selectedCapstone, setSelectedCapstone] = useState<Capstone | null>(null)
-  const [actionLoading, setActionLoading] = useState(false)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
+  const router = useRouter()
+  const { toast } = useToast()
 
-  const handleApprove = async (id: string) => {
-    setActionLoading(true)
-    const supabase = createClient()
-    await supabase.from("capstones").update({ status: "approved" }).eq("id", id)
-    setPendingCapstones((prev) => prev.filter((c) => c.id !== id))
+  const handleApprove = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setActionLoading(id)
+
+    const { error } = await supabase.from("capstones").update({ status: "approved" }).eq("id", id)
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to approve capstone",
+        variant: "destructive",
+      })
+    } else {
+      setPendingCapstones((prev) => prev.filter((c) => c.id !== id))
+      toast({
+        title: "Approved",
+        description: "Capstone has been approved successfully",
+      })
+      router.refresh()
+    }
     setSelectedCapstone(null)
-    setActionLoading(false)
+    setActionLoading(null)
   }
 
-  const handleReject = async (id: string) => {
-    setActionLoading(true)
-    const supabase = createClient()
-    await supabase.from("capstones").update({ status: "rejected" }).eq("id", id)
-    setPendingCapstones((prev) => prev.filter((c) => c.id !== id))
+  const handleReject = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setActionLoading(id)
+
+    const { error } = await supabase.from("capstones").update({ status: "rejected" }).eq("id", id)
+
+    if (error) {
+      toast({
+        title: "Error",
+        description: "Failed to reject capstone",
+        variant: "destructive",
+      })
+    } else {
+      setPendingCapstones((prev) => prev.filter((c) => c.id !== id))
+      toast({
+        title: "Rejected",
+        description: "Capstone has been rejected",
+      })
+      router.refresh()
+    }
     setSelectedCapstone(null)
-    setActionLoading(false)
+    setActionLoading(null)
+  }
+
+  const handleNavigation = (e: React.MouseEvent, path: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    router.push(path)
   }
 
   const statCards = [
@@ -138,52 +184,64 @@ export default function AdminDashboardContent({
             ))}
           </div>
 
-          {/* Quick Actions */}
+          {/* Quick Actions - Using buttons with onClick */}
           <div className="grid md:grid-cols-3 gap-6 mb-10">
-            <Link href="/browse">
-              <Card className="bg-card/50 backdrop-blur border-white/10 hover:border-purple-500/50 transition-all cursor-pointer group">
+            <Button
+              variant="ghost"
+              className="h-auto p-0 hover:bg-transparent"
+              onClick={(e) => handleNavigation(e, "/browse")}
+            >
+              <Card className="w-full bg-card/50 backdrop-blur border-white/10 hover:border-purple-500/50 transition-all cursor-pointer group">
                 <CardContent className="p-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/30 transition-colors">
                     <BookOpen className="w-6 h-6 text-purple-400" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 text-left">
                     <h3 className="font-semibold text-white">Browse All Projects</h3>
                     <p className="text-sm text-muted-foreground">View the complete repository</p>
                   </div>
                   <TrendingUp className="w-5 h-5 text-muted-foreground group-hover:text-purple-400 transition-colors" />
                 </CardContent>
               </Card>
-            </Link>
+            </Button>
 
-            <Link href="/admin/users">
-              <Card className="bg-card/50 backdrop-blur border-white/10 hover:border-cyan-500/50 transition-all cursor-pointer group">
+            <Button
+              variant="ghost"
+              className="h-auto p-0 hover:bg-transparent"
+              onClick={(e) => handleNavigation(e, "/admin/users")}
+            >
+              <Card className="w-full bg-card/50 backdrop-blur border-white/10 hover:border-cyan-500/50 transition-all cursor-pointer group">
                 <CardContent className="p-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
                     <Users className="w-6 h-6 text-cyan-400" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 text-left">
                     <h3 className="font-semibold text-white">Manage Users</h3>
                     <p className="text-sm text-muted-foreground">View and edit user accounts</p>
                   </div>
                   <TrendingUp className="w-5 h-5 text-muted-foreground group-hover:text-cyan-400 transition-colors" />
                 </CardContent>
               </Card>
-            </Link>
+            </Button>
 
-            <Link href="/admin/settings">
-              <Card className="bg-card/50 backdrop-blur border-white/10 hover:border-green-500/50 transition-all cursor-pointer group">
+            <Button
+              variant="ghost"
+              className="h-auto p-0 hover:bg-transparent"
+              onClick={(e) => handleNavigation(e, "/admin/settings")}
+            >
+              <Card className="w-full bg-card/50 backdrop-blur border-white/10 hover:border-green-500/50 transition-all cursor-pointer group">
                 <CardContent className="p-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
                     <Shield className="w-6 h-6 text-green-400" />
                   </div>
-                  <div className="flex-1">
+                  <div className="flex-1 text-left">
                     <h3 className="font-semibold text-white">System Settings</h3>
                     <p className="text-sm text-muted-foreground">Configure platform options</p>
                   </div>
                   <TrendingUp className="w-5 h-5 text-muted-foreground group-hover:text-green-400 transition-colors" />
                 </CardContent>
               </Card>
-            </Link>
+            </Button>
           </div>
 
           {/* Pending Review Section */}
@@ -206,53 +264,78 @@ export default function AdminDashboardContent({
                   <p className="text-muted-foreground">All submissions have been reviewed!</p>
                 </div>
               ) : (
-                pendingCapstones.map((capstone) => (
-                  <div
-                    key={capstone.id}
-                    className="p-4 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
-                            <Clock className="w-3 h-3 mr-1" />
-                            Pending
-                          </Badge>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(capstone.created_at).toLocaleDateString()}
-                          </span>
+                pendingCapstones.map((capstone) => {
+                  const isLoading = actionLoading === capstone.id
+                  return (
+                    <div
+                      key={capstone.id}
+                      className="p-4 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
+                    >
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
+                              <Clock className="w-3 h-3 mr-1" />
+                              Pending
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(capstone.created_at).toLocaleDateString()}
+                            </span>
+                          </div>
+                          <h4 className="font-semibold text-white truncate">{capstone.title}</h4>
+                          <p className="text-sm text-muted-foreground">
+                            {capstone.authors?.join(", ")} | {capstone.category} | {capstone.year}
+                          </p>
                         </div>
-                        <h4 className="font-semibold text-white truncate">{capstone.title}</h4>
-                        <p className="text-sm text-muted-foreground">
-                          {capstone.authors?.join(", ")} | {capstone.category} | {capstone.year}
-                        </p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="border-white/20 hover:bg-white/10 bg-transparent"
-                          onClick={() => setSelectedCapstone(capstone)}
-                        >
-                          <Eye className="w-4 h-4 mr-1" />
-                          Review
-                        </Button>
-                        <Button
-                          size="sm"
-                          className="bg-green-600 hover:bg-green-500"
-                          onClick={() => handleApprove(capstone.id)}
-                        >
-                          <Check className="w-4 h-4 mr-1" />
-                          Approve
-                        </Button>
-                        <Button size="sm" variant="destructive" onClick={() => handleReject(capstone.id)}>
-                          <X className="w-4 h-4 mr-1" />
-                          Reject
-                        </Button>
+                        <div className="flex items-center gap-2 relative z-10">
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="border-white/20 hover:bg-white/10 bg-transparent"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                              setSelectedCapstone(capstone)
+                            }}
+                            disabled={isLoading}
+                          >
+                            <Eye className="w-4 h-4 mr-1" />
+                            Review
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            className="bg-green-600 hover:bg-green-500"
+                            onClick={(e) => handleApprove(e, capstone.id)}
+                            disabled={isLoading}
+                          >
+                            {isLoading ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <Check className="w-4 h-4 mr-1" />
+                            )}
+                            Approve
+                          </Button>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            onClick={(e) => handleReject(e, capstone.id)}
+                            disabled={isLoading}
+                          >
+                            {isLoading ? (
+                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+                            ) : (
+                              <X className="w-4 h-4 mr-1" />
+                            )}
+                            Reject
+                          </Button>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  )
+                })
               )}
             </CardContent>
           </Card>
@@ -285,21 +368,30 @@ export default function AdminDashboardContent({
             </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setSelectedCapstone(null)} className="border-white/20">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setSelectedCapstone(null)}
+              className="border-white/20"
+            >
               Cancel
             </Button>
             <Button
+              type="button"
               variant="destructive"
-              onClick={() => selectedCapstone && handleReject(selectedCapstone.id)}
-              disabled={actionLoading}
+              onClick={(e) => selectedCapstone && handleReject(e, selectedCapstone.id)}
+              disabled={actionLoading === selectedCapstone?.id}
             >
+              {actionLoading === selectedCapstone?.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
               Reject
             </Button>
             <Button
+              type="button"
               className="bg-green-600 hover:bg-green-500"
-              onClick={() => selectedCapstone && handleApprove(selectedCapstone.id)}
-              disabled={actionLoading}
+              onClick={(e) => selectedCapstone && handleApprove(e, selectedCapstone.id)}
+              disabled={actionLoading === selectedCapstone?.id}
             >
+              {actionLoading === selectedCapstone?.id ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null}
               Approve
             </Button>
           </DialogFooter>

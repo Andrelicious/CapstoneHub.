@@ -8,7 +8,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Mail, Lock, User, GraduationCap, ArrowRight, Users, Loader2, CheckCircle } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, User, GraduationCap, ArrowRight, Users, Loader2 } from "lucide-react"
 import AuthLayout from "@/components/auth-layout"
 import type { UserRole } from "@/types"
 import { createClient } from "@/lib/supabase/client"
@@ -33,7 +33,6 @@ export default function RegisterPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isOAuthLoading, setIsOAuthLoading] = useState<"google" | "github" | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isSuccess, setIsSuccess] = useState(false)
   const router = useRouter()
   const { toast } = useToast()
   const [formData, setFormData] = useState({
@@ -102,16 +101,15 @@ export default function RegisterPage() {
 
       if (signUpError) throw signUpError
 
-      setIsSuccess(true)
       toast({
-        title: "Account Created Successfully!",
-        description: "Redirecting you to your dashboard...",
+        title: "Account created!",
+        description: "Welcome to Capstone Hub.",
       })
 
       // Check if email confirmation is required
       if (data.user && !data.session) {
         // Email confirmation required
-        window.location.href = "/register/success"
+        router.replace("/register/success")
       } else if (data.user && data.session) {
         // No email confirmation required, create profile
         const { error: profileError } = await supabase.from("profiles").upsert({
@@ -127,39 +125,20 @@ export default function RegisterPage() {
         }
 
         const dashboardUrl = formData.role === "faculty" ? "/faculty/dashboard" : "/student/dashboard"
-        window.location.href = dashboardUrl
+        router.replace(dashboardUrl)
       }
     } catch (error: unknown) {
-      setIsSuccess(false)
       setError(error instanceof Error ? error.message : "Failed to create account")
       toast({
         title: "Registration Failed",
         description: error instanceof Error ? error.message : "Failed to create account",
         variant: "destructive",
       })
-    } finally {
       setIsLoading(false)
     }
   }
 
-  const isDisabled = isLoading || isOAuthLoading !== null || isSuccess
-
-  if (isSuccess) {
-    return (
-      <AuthLayout>
-        <div className="glass rounded-2xl p-8 border border-white/10 neon-border">
-          <div className="text-center py-8">
-            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Account Created!</h1>
-            <p className="text-muted-foreground mb-4">Redirecting you to your dashboard...</p>
-            <Loader2 className="w-6 h-6 animate-spin mx-auto text-purple-500" />
-          </div>
-        </div>
-      </AuthLayout>
-    )
-  }
+  const isDisabled = isLoading || isOAuthLoading !== null
 
   return (
     <AuthLayout>

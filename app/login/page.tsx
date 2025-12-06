@@ -4,10 +4,11 @@ import type React from "react"
 
 import { useState } from "react"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2, CheckCircle } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from "lucide-react"
 import AuthLayout from "@/components/auth-layout"
 import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
@@ -19,8 +20,8 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [isOAuthLoading, setIsOAuthLoading] = useState<"google" | "github" | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [isSuccess, setIsSuccess] = useState(false)
   const { toast } = useToast()
+  const router = useRouter()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,10 +46,9 @@ export default function LoginPage() {
       if (user) {
         const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-        setIsSuccess(true)
         toast({
           title: "Welcome back!",
-          description: "Redirecting to your dashboard...",
+          description: "Signed in successfully.",
         })
 
         let redirectUrl = "/student/dashboard"
@@ -58,8 +58,7 @@ export default function LoginPage() {
           redirectUrl = "/faculty/dashboard"
         }
 
-        // Instant redirect using window.location
-        window.location.href = redirectUrl
+        router.replace(redirectUrl)
       }
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "Failed to sign in")
@@ -93,24 +92,7 @@ export default function LoginPage() {
     }
   }
 
-  const isDisabled = isLoading || isOAuthLoading !== null || isSuccess
-
-  if (isSuccess) {
-    return (
-      <AuthLayout>
-        <div className="glass rounded-2xl p-8 border border-white/10 neon-border">
-          <div className="text-center py-8">
-            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-green-500" />
-            </div>
-            <h1 className="text-2xl font-bold text-white mb-2">Welcome Back!</h1>
-            <p className="text-muted-foreground mb-4">Redirecting to your dashboard...</p>
-            <Loader2 className="w-6 h-6 animate-spin mx-auto text-purple-500" />
-          </div>
-        </div>
-      </AuthLayout>
-    )
-  }
+  const isDisabled = isLoading || isOAuthLoading !== null
 
   return (
     <AuthLayout>
@@ -217,7 +199,14 @@ export default function LoginPage() {
             type="button"
             variant="outline"
             disabled={isDisabled}
-            onClick={() => handleOAuthSignIn("google")}
+            onClick={() => {
+              setIsOAuthLoading("google")
+              const supabase = createClient()
+              supabase.auth.signInWithOAuth({
+                provider: "google",
+                options: { redirectTo: `${window.location.origin}/auth/callback` },
+              })
+            }}
             className="h-12 bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white"
           >
             {isOAuthLoading === "google" ? (
@@ -248,7 +237,14 @@ export default function LoginPage() {
             type="button"
             variant="outline"
             disabled={isDisabled}
-            onClick={() => handleOAuthSignIn("github")}
+            onClick={() => {
+              setIsOAuthLoading("github")
+              const supabase = createClient()
+              supabase.auth.signInWithOAuth({
+                provider: "github",
+                options: { redirectTo: `${window.location.origin}/auth/callback` },
+              })
+            }}
             className="h-12 bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20 text-white"
           >
             {isOAuthLoading === "github" ? (

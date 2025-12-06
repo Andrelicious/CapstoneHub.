@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
@@ -24,16 +24,18 @@ const categories = [
   "Cybersecurity",
   "Game Development",
   "Cloud Computing",
+  "Other",
 ]
+
+const supabase = createClient()
 
 export default function UploadPage() {
   const router = useRouter()
-  const supabase = useMemo(() => createClient(), [])
 
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  const [customCategory, setCustomCategory] = useState("")
 
   const [formData, setFormData] = useState({
     title: "",
@@ -53,13 +55,13 @@ export default function UploadPage() {
         data: { user },
       } = await supabase.auth.getUser()
       if (!user) {
-        router.push("/login")
+        router.replace("/login")
       } else {
         setUserId(user.id)
       }
     }
     checkAuth()
-  }, [router, supabase])
+  }, [router])
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value })
@@ -128,7 +130,9 @@ export default function UploadPage() {
       return
     }
 
-    if (!formData.title || !formData.abstract || !formData.category) {
+    const finalCategory = formData.category === "Other" ? customCategory.trim() : formData.category
+
+    if (!formData.title || !formData.abstract || !finalCategory) {
       setError("Please fill in all required fields")
       setIsLoading(false)
       return
@@ -142,125 +146,90 @@ export default function UploadPage() {
       const { error: insertError } = await supabase.from("capstones").insert({
         title: formData.title,
         abstract: formData.abstract,
-        category: formData.category,
+        category: finalCategory,
         year: Number.parseInt(formData.year),
         keywords: formData.keywords,
         authors: authorNames,
         uploader_id: userId,
         status: "pending",
-        // For now, we store a placeholder URL. In production, you'd upload to storage first
         pdf_url: file ? `/uploads/${file.name}` : null,
       })
 
       if (insertError) throw insertError
 
-      setSuccess(true)
-
-      // Redirect to dashboard after 2 seconds
-      setTimeout(() => {
-        router.push("/dashboard")
-      }, 2000)
+      router.replace("/student/dashboard")
     } catch (error: unknown) {
       console.error("Upload error:", error)
       setError(error instanceof Error ? error.message : "Failed to submit capstone")
-    } finally {
       setIsLoading(false)
     }
-  }
-
-  if (success) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navbar />
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute top-20 left-1/4 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[150px]" />
-          <div className="absolute bottom-20 right-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[150px]" />
-        </div>
-        <main className="relative pt-32 pb-20">
-          <div className="max-w-xl mx-auto px-6 text-center">
-            <div className="glass rounded-2xl border border-white/10 p-8">
-              <div className="w-20 h-20 mx-auto mb-6 rounded-full bg-green-500/20 flex items-center justify-center">
-                <CheckCircle2 className="w-10 h-10 text-green-400" />
-              </div>
-              <h1 className="text-3xl font-bold text-white mb-4">Submission Successful!</h1>
-              <p className="text-muted-foreground mb-6">
-                Your capstone has been submitted for review. You&apos;ll be notified once it&apos;s approved.
-              </p>
-              <p className="text-sm text-muted-foreground">Redirecting to dashboard...</p>
-            </div>
-          </div>
-        </main>
-        <Footer />
-      </div>
-    )
   }
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar />
 
-      {/* Background effects */}
+      {/* Background Effects */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-1/4 w-[500px] h-[500px] bg-purple-600/10 rounded-full blur-[150px]" />
         <div className="absolute bottom-20 right-1/4 w-[500px] h-[500px] bg-cyan-500/10 rounded-full blur-[150px]" />
       </div>
 
-      <main className="relative pt-32 pb-20">
-        <div className="max-w-4xl mx-auto px-6 lg:px-8">
+      <main className="relative z-10 pt-24 pb-16">
+        <div className="container mx-auto px-4 max-w-4xl">
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-cyan-500 mb-6">
-              <Upload className="w-8 h-8 text-white" />
+            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 mb-6">
+              <Upload className="w-4 h-4 text-purple-400" />
+              <span className="text-sm text-purple-300">Upload Portal</span>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Upload Your{" "}
-              <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
-                Capstone
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">
+              <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 text-transparent bg-clip-text">
+                Submit Your Capstone
               </span>
             </h1>
-            <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-              Share your research with the CCS community
-            </p>
+            <p className="text-muted-foreground text-lg">Share your research with the CCS community</p>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleSubmit} className="space-y-8">
-            {error && (
-              <div className="p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 flex items-center gap-3">
-                <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                {error}
-              </div>
-            )}
+          {/* Error Display */}
+          {error && (
+            <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center gap-3">
+              <AlertCircle className="w-5 h-5 text-red-400" />
+              <p className="text-red-300">{error}</p>
+            </div>
+          )}
 
-            {/* Project Title */}
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-6">
+            {/* Project Information */}
             <div className="glass rounded-2xl border border-white/10 p-6">
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3 mb-6">
                 <div className="w-10 h-10 rounded-xl bg-purple-500/20 flex items-center justify-center">
                   <BookOpen className="w-5 h-5 text-purple-400" />
                 </div>
                 <h2 className="text-xl font-semibold text-white">Project Information</h2>
               </div>
 
-              <div className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="title" className="text-gray-300">
+              <div className="space-y-4">
+                <div>
+                  <Label htmlFor="title" className="text-white mb-2 block">
                     Project Title <span className="text-red-400">*</span>
                   </Label>
                   <Input
                     id="title"
                     name="title"
-                    placeholder="Enter your capstone project title"
                     value={formData.title}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    placeholder="Enter your capstone project title"
                     required
+                    disabled={isLoading}
                     className="h-12 bg-white/5 border-white/10 focus:border-purple-500 text-white placeholder:text-gray-500"
                   />
                 </div>
 
                 <div className="grid md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="category" className="text-gray-300">
+                  <div>
+                    <Label htmlFor="category" className="text-white mb-2 block">
                       Category <span className="text-red-400">*</span>
                     </Label>
                     <select
@@ -268,51 +237,68 @@ export default function UploadPage() {
                       name="category"
                       value={formData.category}
                       onChange={handleChange}
-                      disabled={isLoading}
                       required
-                      className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-md text-white focus:border-purple-500 focus:outline-none"
+                      disabled={isLoading}
+                      className="w-full h-12 px-3 rounded-md bg-white/5 border border-white/10 focus:border-purple-500 text-white"
                     >
-                      <option value="" className="bg-[#0a0612]">
+                      <option value="" className="bg-gray-900">
                         Select a category
                       </option>
                       {categories.map((cat) => (
-                        <option key={cat} value={cat} className="bg-[#0a0612]">
+                        <option key={cat} value={cat} className="bg-gray-900">
                           {cat}
                         </option>
                       ))}
                     </select>
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="year" className="text-gray-300">
+
+                  <div>
+                    <Label htmlFor="year" className="text-white mb-2 block">
                       Year Completed
                     </Label>
                     <Input
                       id="year"
                       name="year"
                       type="number"
-                      placeholder="2024"
                       value={formData.year}
                       onChange={handleChange}
                       disabled={isLoading}
-                      className="h-12 bg-white/5 border-white/10 focus:border-purple-500 text-white placeholder:text-gray-500"
+                      className="h-12 bg-white/5 border-white/10 focus:border-purple-500 text-white"
                     />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="abstract" className="text-gray-300">
+                {/* Custom Category Input */}
+                {formData.category === "Other" && (
+                  <div>
+                    <Label htmlFor="customCategory" className="text-white mb-2 block">
+                      Custom Category <span className="text-red-400">*</span>
+                    </Label>
+                    <Input
+                      id="customCategory"
+                      value={customCategory}
+                      onChange={(e) => setCustomCategory(e.target.value)}
+                      placeholder="Enter your custom category"
+                      required
+                      disabled={isLoading}
+                      className="h-12 bg-white/5 border-white/10 focus:border-purple-500 text-white placeholder:text-gray-500"
+                    />
+                  </div>
+                )}
+
+                <div>
+                  <Label htmlFor="abstract" className="text-white mb-2 block">
                     Abstract <span className="text-red-400">*</span>
                   </Label>
                   <Textarea
                     id="abstract"
                     name="abstract"
-                    placeholder="Provide a brief summary of your research (minimum 150 words)"
                     value={formData.abstract}
                     onChange={handleChange}
-                    disabled={isLoading}
+                    placeholder="Provide a brief summary of your capstone project (150-300 words)"
                     required
-                    rows={6}
-                    className="bg-white/5 border-white/10 focus:border-purple-500 text-white placeholder:text-gray-500 resize-none"
+                    disabled={isLoading}
+                    className="min-h-[150px] bg-white/5 border-white/10 focus:border-purple-500 text-white placeholder:text-gray-500"
                   />
                 </div>
               </div>
@@ -320,7 +306,7 @@ export default function UploadPage() {
 
             {/* Authors */}
             <div className="glass rounded-2xl border border-white/10 p-6">
-              <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-blue-500/20 flex items-center justify-center">
                     <Users className="w-5 h-5 text-blue-400" />
@@ -526,7 +512,10 @@ export default function UploadPage() {
                     Submitting...
                   </>
                 ) : (
-                  "Submit for Review"
+                  <>
+                    <Upload className="w-5 h-5 mr-2" />
+                    Submit Capstone
+                  </>
                 )}
               </Button>
             </div>

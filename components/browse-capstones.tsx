@@ -99,13 +99,13 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
         newFavorites.delete(id)
         toast({
           title: "Removed from favorites",
-          description: `"${title.slice(0, 40)}..." removed from your favorites (local only)`,
+          description: `"${title.slice(0, 40)}..." removed from your favorites`,
         })
       } else {
         newFavorites.add(id)
         toast({
           title: "Added to favorites",
-          description: `"${title.slice(0, 40)}..." added to your favorites (local only)`,
+          description: `"${title.slice(0, 40)}..." added to your favorites`,
         })
       }
       return newFavorites
@@ -133,13 +133,13 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
         <div className="flex flex-col md:flex-row gap-4">
           {/* Search Bar */}
           <div className="relative flex-1">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-500" />
             <Input
               type="text"
               placeholder="Search by title, author, keyword, or abstract..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-12 h-14 bg-white/5 border-white/10 focus:border-purple-500 text-white placeholder:text-gray-500 rounded-xl"
+              className="pl-12 h-14 bg-[#1a1425] border-[#2a2435] focus:border-cyan-500 text-white placeholder:text-gray-500 rounded-xl"
             />
             {searchQuery && (
               <button
@@ -154,12 +154,12 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
           {/* Filter Toggle (Mobile) */}
           <Button
             variant="outline"
-            className="md:hidden h-14 bg-white/5 border-white/10 text-white"
+            className="md:hidden h-14 bg-[#1a1425] border-[#2a2435] text-cyan-400"
             onClick={() => setShowFilters(!showFilters)}
           >
             <Filter className="w-5 h-5 mr-2" />
             Filters
-            {hasActiveFilters && <span className="ml-2 w-2 h-2 bg-purple-500 rounded-full" />}
+            {hasActiveFilters && <span className="ml-2 w-2 h-2 bg-cyan-500 rounded-full" />}
             <ChevronDown className={`w-4 h-4 ml-2 transition-transform ${showFilters ? "rotate-180" : ""}`} />
           </Button>
 
@@ -169,7 +169,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="h-14 px-4 pr-10 bg-white/5 border border-white/10 rounded-xl text-white appearance-none cursor-pointer focus:border-purple-500 focus:outline-none min-w-[180px]"
+                className="h-14 px-4 pr-10 bg-[#1a1425] border border-[#2a2435] rounded-xl text-white appearance-none cursor-pointer focus:border-cyan-500 focus:outline-none min-w-[180px]"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat} className="bg-[#0a0612] text-white">
@@ -177,14 +177,14 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
 
             <div className="relative">
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="h-14 px-4 pr-10 bg-white/5 border border-white/10 rounded-xl text-white appearance-none cursor-pointer focus:border-purple-500 focus:outline-none min-w-[140px]"
+                className="h-14 px-4 pr-10 bg-[#1a1425] border border-[#2a2435] rounded-xl text-white appearance-none cursor-pointer focus:border-cyan-500 focus:outline-none min-w-[140px]"
               >
                 {years.map((year) => (
                   <option key={year} value={year} className="bg-[#0a0612] text-white">
@@ -192,20 +192,20 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                   </option>
                 ))}
               </select>
-              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
           </div>
         </div>
 
         {/* Mobile Filters */}
         {showFilters && (
-          <div className="md:hidden mt-4 p-4 glass rounded-xl border border-white/10 space-y-4">
+          <div className="md:hidden mt-4 p-4 bg-[#1a1425]/90 backdrop-blur-xl rounded-xl border border-[#2a2435] space-y-4">
             <div>
               <label className="text-sm text-gray-400 mb-2 block">Category</label>
               <select
                 value={selectedCategory}
                 onChange={(e) => setSelectedCategory(e.target.value)}
-                className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-lg text-white"
+                className="w-full h-12 px-4 bg-[#0a0612] border border-[#2a2435] rounded-lg text-white"
               >
                 {categories.map((cat) => (
                   <option key={cat} value={cat} className="bg-[#0a0612]">
@@ -219,7 +219,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
               <select
                 value={selectedYear}
                 onChange={(e) => setSelectedYear(e.target.value)}
-                className="w-full h-12 px-4 bg-white/5 border border-white/10 rounded-lg text-white"
+                className="w-full h-12 px-4 bg-[#0a0612] border border-[#2a2435] rounded-lg text-white"
               >
                 {years.map((year) => (
                   <option key={year} value={year} className="bg-[#0a0612]">
@@ -232,7 +232,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
               <Button
                 variant="ghost"
                 onClick={clearFilters}
-                className="w-full text-purple-400 hover:text-purple-300 hover:bg-purple-500/10"
+                className="w-full text-cyan-400 hover:text-cyan-300 hover:bg-cyan-500/10"
               >
                 Clear All Filters
               </Button>
@@ -244,12 +244,12 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
       {/* Results Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-4">
-          <p className="text-muted-foreground">
+          <p className="text-gray-400">
             Showing <span className="text-white font-medium">{filteredAndSortedCapstones.length}</span> of{" "}
             <span className="text-white font-medium">{initialCapstones.length}</span> projects
           </p>
           {hasActiveFilters && (
-            <button onClick={clearFilters} className="text-sm text-purple-400 hover:text-purple-300 hidden md:block">
+            <button onClick={clearFilters} className="text-sm text-cyan-400 hover:text-cyan-300 hidden md:block">
               Clear filters
             </button>
           )}
@@ -258,12 +258,12 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
         <div className="flex items-center gap-4">
           {/* Sort Dropdown */}
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground hidden sm:block">Sort:</span>
+            <span className="text-sm text-gray-400 hidden sm:block">Sort:</span>
             <div className="relative">
               <select
                 value={sortBy}
                 onChange={(e) => setSortBy(e.target.value as SortOption)}
-                className="h-10 pl-3 pr-8 bg-white/5 border border-white/10 rounded-lg text-white text-sm appearance-none cursor-pointer focus:border-purple-500 focus:outline-none"
+                className="h-10 pl-3 pr-8 bg-[#1a1425] border border-[#2a2435] rounded-lg text-white text-sm appearance-none cursor-pointer focus:border-cyan-500 focus:outline-none"
               >
                 <option value="recent" className="bg-[#0a0612]">
                   Most Recent
@@ -278,16 +278,16 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                   Title Z-A
                 </option>
               </select>
-              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+              <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 pointer-events-none" />
             </div>
           </div>
 
           {/* View Toggle */}
-          <div className="flex items-center gap-1 p-1 bg-white/5 rounded-lg border border-white/10">
+          <div className="flex items-center gap-1 p-1 bg-[#1a1425] rounded-lg border border-[#2a2435]">
             <button
               onClick={() => setViewMode("list")}
               className={`p-2 rounded-md transition-colors ${
-                viewMode === "list" ? "bg-purple-500/20 text-purple-400" : "text-gray-400 hover:text-white"
+                viewMode === "list" ? "bg-cyan-500/20 text-cyan-400" : "text-gray-400 hover:text-white"
               }`}
             >
               <List className="w-4 h-4" />
@@ -295,7 +295,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
             <button
               onClick={() => setViewMode("grid")}
               className={`p-2 rounded-md transition-colors ${
-                viewMode === "grid" ? "bg-purple-500/20 text-purple-400" : "text-gray-400 hover:text-white"
+                viewMode === "grid" ? "bg-cyan-500/20 text-cyan-400" : "text-gray-400 hover:text-white"
               }`}
             >
               <Grid3X3 className="w-4 h-4" />
@@ -310,7 +310,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
           {searchQuery && (
             <Badge
               variant="outline"
-              className="bg-purple-500/10 border-purple-500/30 text-purple-300 px-3 py-1 cursor-pointer hover:bg-purple-500/20"
+              className="bg-cyan-500/10 border-cyan-500/30 text-cyan-300 px-3 py-1 cursor-pointer hover:bg-cyan-500/20"
               onClick={() => setSearchQuery("")}
             >
               Search: {searchQuery} ×
@@ -328,7 +328,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
           {selectedYear !== "All Years" && (
             <Badge
               variant="outline"
-              className="bg-cyan-500/10 border-cyan-500/30 text-cyan-300 px-3 py-1 cursor-pointer hover:bg-cyan-500/20"
+              className="bg-emerald-500/10 border-emerald-500/30 text-emerald-300 px-3 py-1 cursor-pointer hover:bg-emerald-500/20"
               onClick={() => setSelectedYear("All Years")}
             >
               {selectedYear} ×
@@ -339,10 +339,10 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
 
       {/* Project Cards */}
       {filteredAndSortedCapstones.length === 0 ? (
-        <div className="text-center py-16 glass rounded-2xl border border-white/10">
-          <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+        <div className="text-center py-16 bg-[#1a1425]/80 backdrop-blur-xl rounded-2xl border border-[#2a2435]">
+          <FileText className="w-16 h-16 text-gray-500 mx-auto mb-4" />
           <h3 className="text-xl font-semibold text-white mb-2">No capstone projects found</h3>
-          <p className="text-muted-foreground mb-6">
+          <p className="text-gray-400 mb-6">
             {hasActiveFilters
               ? "Try adjusting your search or filters"
               : "No approved capstones available yet. Check back soon!"}
@@ -351,7 +351,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
             <Button
               onClick={clearFilters}
               variant="outline"
-              className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+              className="bg-[#1a1425] border-[#2a2435] text-white hover:bg-[#2a2435]"
             >
               Clear All Filters
             </Button>
@@ -363,35 +363,38 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
           {filteredAndSortedCapstones.map((capstone) => (
             <div
               key={capstone.id}
-              className="group glass rounded-2xl border border-white/10 p-6 hover:border-purple-500/50 transition-all duration-300"
+              className="group bg-[#1a1425]/80 backdrop-blur-xl rounded-2xl border border-[#2a2435] p-6 hover:border-cyan-500/50 transition-all duration-300"
             >
               <div className="flex flex-col lg:flex-row lg:items-start gap-6">
                 <div className="flex-1">
                   <div className="flex flex-wrap items-center gap-3 mb-3">
                     {capstone.category && (
-                      <Badge className="bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border-purple-500/30">
+                      <Badge className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-blue-500/30">
                         {capstone.category}
                       </Badge>
                     )}
                     {capstone.year && (
-                      <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                      <div className="flex items-center gap-1 text-sm text-gray-400">
                         <Calendar className="w-4 h-4" />
                         {capstone.year}
                       </div>
                     )}
-                    <Badge variant="outline" className="bg-green-500/10 border-green-500/30 text-green-400 text-xs">
+                    <Badge
+                      variant="outline"
+                      className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 text-xs"
+                    >
                       Approved
                     </Badge>
                   </div>
 
                   <Link href={`/capstones/${capstone.id}`}>
-                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-purple-300 transition-colors cursor-pointer">
+                    <h3 className="text-xl font-semibold text-white mb-2 group-hover:text-cyan-400 transition-colors cursor-pointer">
                       {capstone.title}
                     </h3>
                   </Link>
 
                   {capstone.authors && capstone.authors.length > 0 && (
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground mb-4">
+                    <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
                       <User className="w-4 h-4" />
                       {capstone.authors.join(", ")}
                     </div>
@@ -401,50 +404,46 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
 
                   {capstone.keywords && capstone.keywords.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {capstone.keywords.slice(0, 5).map((keyword, index) => (
-                        <Badge
-                          key={index}
-                          variant="outline"
-                          className="bg-white/5 border-white/10 text-gray-400 text-xs"
+                      {capstone.keywords.slice(0, 4).map((keyword, idx) => (
+                        <span
+                          key={idx}
+                          className="text-xs px-2 py-1 bg-[#0a0612] border border-[#2a2435] rounded-md text-gray-400"
                         >
                           {keyword}
-                        </Badge>
+                        </span>
                       ))}
-                      {capstone.keywords.length > 5 && (
-                        <Badge variant="outline" className="bg-white/5 border-white/10 text-gray-400 text-xs">
-                          +{capstone.keywords.length - 5} more
-                        </Badge>
+                      {capstone.keywords.length > 4 && (
+                        <span className="text-xs px-2 py-1 text-gray-500">+{capstone.keywords.length - 4} more</span>
                       )}
                     </div>
                   )}
                 </div>
 
-                <div className="flex lg:flex-col gap-3">
+                {/* Actions */}
+                <div className="flex flex-row lg:flex-col gap-3 lg:min-w-[140px]">
                   <Link href={`/capstones/${capstone.id}`} className="flex-1 lg:flex-none">
-                    <Button className="w-full bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white">
+                    <Button className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white">
                       <BookOpen className="w-4 h-4 mr-2" />
                       View Details
                     </Button>
                   </Link>
                   <Button
                     variant="outline"
-                    className="flex-1 lg:flex-none bg-white/5 border-white/10 text-white hover:bg-white/10"
+                    className="flex-1 lg:flex-none bg-[#0a0612] border-[#2a2435] text-white hover:bg-[#1a1425]"
                     onClick={() => handleDownload(capstone.pdf_url, capstone.title)}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Download
                   </Button>
                   <Button
-                    variant="outline"
+                    variant="ghost"
                     size="icon"
-                    className={`bg-white/5 border-white/10 hover:bg-pink-500/10 hover:border-pink-500/30 ${
-                      favorites.has(capstone.id)
-                        ? "text-pink-400 border-pink-500/30 bg-pink-500/10"
-                        : "text-white hover:text-pink-400"
-                    }`}
+                    className={`${
+                      favorites.has(capstone.id) ? "text-red-400 hover:text-red-300" : "text-gray-400 hover:text-white"
+                    } hover:bg-[#1a1425]`}
                     onClick={() => toggleFavorite(capstone.id, capstone.title)}
                   >
-                    <Heart className={`w-4 h-4 ${favorites.has(capstone.id) ? "fill-current" : ""}`} />
+                    <Heart className={`w-5 h-5 ${favorites.has(capstone.id) ? "fill-current" : ""}`} />
                   </Button>
                 </div>
               </div>
@@ -453,30 +452,24 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
         </div>
       ) : (
         // Grid View
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredAndSortedCapstones.map((capstone) => (
             <div
               key={capstone.id}
-              className="group glass rounded-2xl border border-white/10 overflow-hidden hover:border-purple-500/50 transition-all duration-300 flex flex-col"
+              className="group bg-[#1a1425]/80 backdrop-blur-xl rounded-2xl border border-[#2a2435] overflow-hidden hover:border-cyan-500/50 transition-all duration-300 flex flex-col"
             >
               {/* Thumbnail */}
-              <div className="h-40 bg-gradient-to-br from-purple-600/20 to-cyan-500/20 flex items-center justify-center relative">
-                {capstone.thumbnail_url ? (
-                  <img
-                    src={capstone.thumbnail_url || "/placeholder.svg"}
-                    alt={capstone.title}
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <FileText className="w-16 h-16 text-white/20" />
-                )}
+              <div className="aspect-video bg-gradient-to-br from-[#1a1425] to-[#0a0612] flex items-center justify-center relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-cyan-500/10 to-blue-500/10" />
+                <FileText className="w-12 h-12 text-gray-600" />
+                {/* Favorite Button */}
                 <button
-                  className={`absolute top-3 right-3 p-2 rounded-full transition-colors ${
-                    favorites.has(capstone.id)
-                      ? "bg-pink-500/20 text-pink-400"
-                      : "bg-black/40 text-white hover:bg-pink-500/20 hover:text-pink-400"
-                  }`}
                   onClick={() => toggleFavorite(capstone.id, capstone.title)}
+                  className={`absolute top-3 right-3 p-2 rounded-full backdrop-blur-sm transition-all ${
+                    favorites.has(capstone.id)
+                      ? "bg-red-500/20 text-red-400"
+                      : "bg-black/30 text-gray-400 hover:text-white"
+                  }`}
                 >
                   <Heart className={`w-4 h-4 ${favorites.has(capstone.id) ? "fill-current" : ""}`} />
                 </button>
@@ -485,32 +478,41 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
               <div className="p-5 flex-1 flex flex-col">
                 <div className="flex flex-wrap items-center gap-2 mb-3">
                   {capstone.category && (
-                    <Badge className="bg-purple-500/20 text-purple-300 hover:bg-purple-500/30 border-purple-500/30 text-xs">
+                    <Badge className="bg-blue-500/20 text-blue-300 hover:bg-blue-500/30 border-blue-500/30 text-xs">
                       {capstone.category}
                     </Badge>
                   )}
-                  {capstone.year && <span className="text-xs text-muted-foreground">{capstone.year}</span>}
+                  {capstone.year && (
+                    <span className="text-xs text-gray-500 flex items-center gap-1">
+                      <Calendar className="w-3 h-3" />
+                      {capstone.year}
+                    </span>
+                  )}
                 </div>
 
                 <Link href={`/capstones/${capstone.id}`}>
-                  <h3 className="font-semibold text-white mb-2 line-clamp-2 group-hover:text-purple-300 transition-colors cursor-pointer">
+                  <h3 className="font-semibold text-white mb-2 line-clamp-2 group-hover:text-cyan-400 transition-colors cursor-pointer">
                     {capstone.title}
                   </h3>
                 </Link>
 
                 {capstone.authors && capstone.authors.length > 0 && (
-                  <p className="text-sm text-muted-foreground mb-3 line-clamp-1">{capstone.authors.join(", ")}</p>
+                  <p className="text-sm text-gray-400 mb-3 line-clamp-1">
+                    <User className="w-3 h-3 inline mr-1" />
+                    {capstone.authors.join(", ")}
+                  </p>
                 )}
 
                 {capstone.abstract && (
-                  <p className="text-sm text-gray-400 line-clamp-3 mb-4 flex-1">{capstone.abstract}</p>
+                  <p className="text-sm text-gray-500 line-clamp-2 mb-4 flex-1">{capstone.abstract}</p>
                 )}
 
-                <div className="flex gap-2 mt-auto">
+                {/* Actions */}
+                <div className="flex gap-2 mt-auto pt-4 border-t border-[#2a2435]">
                   <Link href={`/capstones/${capstone.id}`} className="flex-1">
                     <Button
                       size="sm"
-                      className="w-full bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white"
+                      className="w-full bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white"
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       View
@@ -519,7 +521,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                   <Button
                     size="sm"
                     variant="outline"
-                    className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                    className="bg-[#0a0612] border-[#2a2435] text-white hover:bg-[#1a1425]"
                     onClick={() => handleDownload(capstone.pdf_url, capstone.title)}
                   >
                     <Download className="w-4 h-4" />

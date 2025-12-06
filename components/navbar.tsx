@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
-import { usePathname } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Upload, Bell } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
@@ -24,7 +24,9 @@ export default function Navbar() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [mounted, setMounted] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
   const pathname = usePathname()
+  const router = useRouter()
 
   useEffect(() => {
     setMounted(true)
@@ -54,6 +56,7 @@ export default function Navbar() {
 
         if (profileData) {
           setProfile(profileData)
+          fetchUnreadCount(authUser.id, profileData.role)
         } else {
           setProfile({
             display_name: authUser.user_metadata?.display_name || authUser.email?.split("@")[0] || "User",
@@ -61,12 +64,26 @@ export default function Navbar() {
             role: authUser.user_metadata?.role || "student",
             avatar_url: authUser.user_metadata?.avatar_url || null,
           })
+          fetchUnreadCount(authUser.id, "student")
         }
       } else {
         setUser(null)
         setProfile(null)
+        setUnreadCount(0)
       }
       setLoading(false)
+    }
+
+    const fetchUnreadCount = async (userId: string, role: string | null) => {
+      const { count, error } = await supabase
+        .from("notifications")
+        .select("*", { count: "exact", head: true })
+        .or(`user_id.eq.${userId},target_role.eq.${role || "student"}`)
+        .eq("is_read", false)
+
+      if (!error && count !== null) {
+        setUnreadCount(count)
+      }
     }
 
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -81,6 +98,7 @@ export default function Navbar() {
       } else if (event === "SIGNED_OUT") {
         setUser(null)
         setProfile(null)
+        setUnreadCount(0)
       }
     })
 
@@ -113,10 +131,11 @@ export default function Navbar() {
     { name: "Contact", href: "/#contact" },
   ]
 
-  const unreadNotifications = 2
+  const handleNotificationsClick = () => {
+    router.push("/notifications")
+  }
 
   const renderAuthSection = () => {
-    // Show login/register buttons during SSR to prevent empty space
     if (!mounted || loading) {
       return (
         <div className="flex items-center gap-3">
@@ -134,7 +153,6 @@ export default function Navbar() {
       )
     }
 
-    // User is logged in
     if (user) {
       return (
         <>
@@ -149,12 +167,12 @@ export default function Navbar() {
             variant="ghost"
             size="icon"
             className="text-gray-300 hover:text-white hover:bg-white/10 relative"
-            onClick={() => setProfilePanelOpen(true)}
+            onClick={handleNotificationsClick}
           >
             <Bell className="w-5 h-5" />
-            {unreadNotifications > 0 && (
+            {unreadCount > 0 && (
               <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full text-xs font-bold flex items-center justify-center text-white">
-                {unreadNotifications}
+                {unreadCount > 9 ? "9+" : unreadCount}
               </span>
             )}
           </Button>
@@ -179,7 +197,6 @@ export default function Navbar() {
       )
     }
 
-    // User is not logged in
     return (
       <>
         <Link href="/login">
@@ -299,6 +316,19 @@ export default function Navbar() {
                       onClick={() => setMobileOpen(false)}
                     >
                       Dashboard
+                    </Link>
+                    <Link
+                      href="/notifications"
+                      className="text-gray-300 hover:text-white transition-colors px-4 py-2 flex items-center gap-2"
+                      onClick={() => setMobileOpen(false)}
+                    >
+                      <Bell className="w-4 h-4" />
+                      Notifications
+                      {unreadCount > 0 && (
+                        <span className="ml-auto bg-purple-500 text-white text-xs px-2 py-0.5 rounded-full">
+                          {unreadCount}
+                        </span>
+                      )}
                     </Link>
                   </>
                 )}
