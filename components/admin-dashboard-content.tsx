@@ -1,7 +1,8 @@
 "use client"
 
 import type React from "react"
-
+import { useState, useRef } from "react"
+import { createClient } from "@/lib/supabase/client"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import {
@@ -24,7 +25,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useRouter } from "next/navigation"
-import { useState } from "react"
 import {
   Dialog,
   DialogContent,
@@ -33,10 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { createClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
-
-const supabase = createClient()
 
 interface Stats {
   total_capstones: number
@@ -75,12 +72,21 @@ export default function AdminDashboardContent({
   const [actionLoading, setActionLoading] = useState<string | null>(null)
   const router = useRouter()
   const { toast } = useToast()
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+
+  const getSupabase = () => {
+    if (!supabaseRef.current) {
+      supabaseRef.current = createClient()
+    }
+    return supabaseRef.current
+  }
 
   const handleApprove = async (e: React.MouseEvent, id: string) => {
     e.preventDefault()
     e.stopPropagation()
     setActionLoading(id)
 
+    const supabase = getSupabase()
     const { error } = await supabase.from("capstones").update({ status: "approved" }).eq("id", id)
 
     if (error) {
@@ -106,6 +112,7 @@ export default function AdminDashboardContent({
     e.stopPropagation()
     setActionLoading(id)
 
+    const supabase = getSupabase()
     const { error } = await supabase.from("capstones").update({ status: "rejected" }).eq("id", id)
 
     if (error) {
@@ -184,13 +191,9 @@ export default function AdminDashboardContent({
             ))}
           </div>
 
-          {/* Quick Actions - Using buttons with onClick */}
+          {/* Quick Actions */}
           <div className="grid md:grid-cols-3 gap-6 mb-10">
-            <Button
-              variant="ghost"
-              className="h-auto p-0 hover:bg-transparent"
-              onClick={(e) => handleNavigation(e, "/browse")}
-            >
+            <a href="/browse" className="block">
               <Card className="w-full bg-card/50 backdrop-blur border-white/10 hover:border-purple-500/50 transition-all cursor-pointer group">
                 <CardContent className="p-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-purple-500/20 flex items-center justify-center group-hover:bg-purple-500/30 transition-colors">
@@ -203,13 +206,9 @@ export default function AdminDashboardContent({
                   <TrendingUp className="w-5 h-5 text-muted-foreground group-hover:text-purple-400 transition-colors" />
                 </CardContent>
               </Card>
-            </Button>
+            </a>
 
-            <Button
-              variant="ghost"
-              className="h-auto p-0 hover:bg-transparent"
-              onClick={(e) => handleNavigation(e, "/admin/users")}
-            >
+            <a href="/admin/users" className="block">
               <Card className="w-full bg-card/50 backdrop-blur border-white/10 hover:border-cyan-500/50 transition-all cursor-pointer group">
                 <CardContent className="p-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-cyan-500/20 flex items-center justify-center group-hover:bg-cyan-500/30 transition-colors">
@@ -222,13 +221,9 @@ export default function AdminDashboardContent({
                   <TrendingUp className="w-5 h-5 text-muted-foreground group-hover:text-cyan-400 transition-colors" />
                 </CardContent>
               </Card>
-            </Button>
+            </a>
 
-            <Button
-              variant="ghost"
-              className="h-auto p-0 hover:bg-transparent"
-              onClick={(e) => handleNavigation(e, "/admin/settings")}
-            >
+            <a href="/admin/settings" className="block">
               <Card className="w-full bg-card/50 backdrop-blur border-white/10 hover:border-green-500/50 transition-all cursor-pointer group">
                 <CardContent className="p-6 flex items-center gap-4">
                   <div className="w-12 h-12 rounded-xl bg-green-500/20 flex items-center justify-center group-hover:bg-green-500/30 transition-colors">
@@ -241,7 +236,7 @@ export default function AdminDashboardContent({
                   <TrendingUp className="w-5 h-5 text-muted-foreground group-hover:text-green-400 transition-colors" />
                 </CardContent>
               </Card>
-            </Button>
+            </a>
           </div>
 
           {/* Pending Review Section */}
@@ -287,7 +282,7 @@ export default function AdminDashboardContent({
                             {capstone.authors?.join(", ")} | {capstone.category} | {capstone.year}
                           </p>
                         </div>
-                        <div className="flex items-center gap-2 relative z-10">
+                        <div className="flex items-center gap-2">
                           <Button
                             type="button"
                             size="sm"

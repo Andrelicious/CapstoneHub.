@@ -2,26 +2,48 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import Link from "next/link"
 import AbstractShapes from "@/components/abstract-shapes"
 import ParticleField from "@/components/particle-field"
+import { createBrowserClient } from "@supabase/ssr"
 
 export default function HeroSection() {
   const [searchQuery, setSearchQuery] = useState("")
+  const [userRole, setUserRole] = useState<string | null>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    const checkUserRole = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      )
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (session?.user) {
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single()
+        if (profile) {
+          setUserRole(profile.role)
+        }
+      }
+    }
+    checkUserRole()
+  }, [])
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault()
     if (searchQuery.trim()) {
-      router.push(`/browse?q=${encodeURIComponent(searchQuery.trim())}`)
+      window.location.href = `/browse?q=${encodeURIComponent(searchQuery.trim())}`
     } else {
-      router.push("/browse")
+      window.location.href = "/browse"
     }
   }
+
+  const showUploadButton = userRole !== "admin" && userRole !== "faculty"
 
   return (
     <section id="home" className="relative min-h-screen flex items-center pt-20">
@@ -70,23 +92,25 @@ export default function HeroSection() {
             </form>
 
             <div className="flex flex-wrap gap-4">
-              <Link href="/browse">
+              <a href="/browse">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-500 hover:to-cyan-400 text-white px-8 py-6 text-lg shadow-2xl shadow-purple-500/30 transition-all duration-300 hover:shadow-purple-500/50 hover:scale-105"
                 >
                   Browse Projects
                 </Button>
-              </Link>
-              <Link href="/upload">
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-purple-500/50 text-purple-300 hover:bg-purple-500/10 hover:border-purple-400 px-8 py-6 text-lg transition-all duration-300 hover:scale-105 bg-transparent"
-                >
-                  Upload Capstone
-                </Button>
-              </Link>
+              </a>
+              {showUploadButton && (
+                <a href="/upload">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-purple-500/50 text-purple-300 hover:bg-purple-500/10 hover:border-purple-400 px-8 py-6 text-lg transition-all duration-300 hover:scale-105 bg-transparent"
+                  >
+                    Upload Capstone
+                  </Button>
+                </a>
+              )}
             </div>
 
             {/* Stats */}

@@ -178,14 +178,10 @@ export default function NotificationsPage() {
     setMarkingAll(false)
   }
 
-  const handleBackToDashboard = () => {
-    if (userRole === "admin") {
-      router.push("/admin/dashboard")
-    } else if (userRole === "faculty") {
-      router.push("/faculty/dashboard")
-    } else {
-      router.push("/student/dashboard")
-    }
+  const getDashboardUrl = () => {
+    if (userRole === "admin") return "/admin/dashboard"
+    if (userRole === "faculty") return "/faculty/dashboard"
+    return "/student/dashboard"
   }
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
@@ -203,13 +199,13 @@ export default function NotificationsPage() {
       <Navbar />
       <div className="pt-24 pb-12 px-6">
         <div className="max-w-3xl mx-auto">
-          <button
-            onClick={handleBackToDashboard}
+          <a
+            href={getDashboardUrl()}
             className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
             Back to Dashboard
-          </button>
+          </a>
 
           <div className="flex items-center justify-between mb-8">
             <div className="flex items-center gap-3">

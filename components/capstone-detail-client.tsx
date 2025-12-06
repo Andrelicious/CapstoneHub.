@@ -1,7 +1,6 @@
 "use client"
 
 import { useState } from "react"
-import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { useToast } from "@/hooks/use-toast"
@@ -110,16 +109,16 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
   return (
     <>
       {/* Back Button */}
-      <Link
+      <a
         href="/browse"
-        className="inline-flex items-center gap-2 text-muted-foreground hover:text-white transition-colors mb-8"
+        className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-8"
       >
         <ArrowLeft className="w-4 h-4" />
         Back to Browse
-      </Link>
+      </a>
 
       {/* Header Card */}
-      <div className="glass rounded-2xl border border-white/10 p-6 md:p-8 mb-6">
+      <div className="bg-[#1a1425]/80 backdrop-blur-xl rounded-2xl border border-[#2a2435] p-6 md:p-8 mb-6">
         {/* Status & Category */}
         <div className="flex flex-wrap items-center gap-3 mb-4">
           <Badge className={`${status.bgColor} ${status.color} border`}>
@@ -130,7 +129,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
             <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">{capstone.category}</Badge>
           )}
           {capstone.year && (
-            <span className="text-sm text-muted-foreground flex items-center gap-1">
+            <span className="text-sm text-gray-400 flex items-center gap-1">
               <Calendar className="w-4 h-4" />
               {capstone.year}
             </span>
@@ -141,7 +140,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
         <h1 className="text-2xl md:text-3xl font-bold text-white mb-4 leading-tight">{capstone.title}</h1>
 
         {/* Meta Info */}
-        <div className="grid sm:grid-cols-2 gap-4 text-muted-foreground mb-6">
+        <div className="grid sm:grid-cols-2 gap-4 text-gray-400 mb-6">
           {capstone.authors && capstone.authors.length > 0 && (
             <div className="flex items-center gap-2">
               <User className="w-5 h-5 text-purple-400 flex-shrink-0" />
@@ -183,7 +182,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
               {capstone.keywords.map((keyword) => (
                 <span
                   key={keyword}
-                  className="px-3 py-1 rounded-full bg-white/5 text-sm text-gray-300 border border-white/10 hover:border-purple-500/50 transition-colors"
+                  className="px-3 py-1 rounded-full bg-white/5 text-sm text-gray-300 border border-[#2a2435] hover:border-purple-500/50 transition-colors"
                 >
                   {keyword}
                 </span>
@@ -197,7 +196,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
           {capstone.status === "approved" && (
             <>
               <Button
-                className="bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400"
+                className="bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white"
                 onClick={handleDownload}
               >
                 <Download className="w-4 h-4 mr-2" />
@@ -206,7 +205,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
               {capstone.pdf_url && (
                 <Button
                   variant="outline"
-                  className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+                  className="bg-[#1a1425] border-[#2a2435] text-white hover:bg-[#2a2435]"
                   onClick={() => window.open(capstone.pdf_url!, "_blank")}
                 >
                   <Eye className="w-4 h-4 mr-2" />
@@ -217,7 +216,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
           )}
           <Button
             variant="outline"
-            className="bg-white/5 border-white/10 text-white hover:bg-white/10"
+            className="bg-[#1a1425] border-[#2a2435] text-white hover:bg-[#2a2435]"
             onClick={handleShare}
           >
             <Share2 className="w-4 h-4 mr-2" />
@@ -225,7 +224,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
           </Button>
           <Button
             variant="outline"
-            className={`bg-white/5 border-white/10 hover:bg-pink-500/10 hover:border-pink-500/30 transition-colors ${
+            className={`bg-[#1a1425] border-[#2a2435] hover:bg-pink-500/10 hover:border-pink-500/30 transition-colors ${
               isSaved ? "text-pink-400 border-pink-500/30 bg-pink-500/10" : "text-white"
             }`}
             onClick={toggleSave}
@@ -238,7 +237,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
 
       {/* Abstract */}
       {capstone.abstract && (
-        <div className="glass rounded-2xl border border-white/10 p-6 md:p-8 mb-6">
+        <div className="bg-[#1a1425]/80 backdrop-blur-xl rounded-2xl border border-[#2a2435] p-6 md:p-8 mb-6">
           <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
             <FileText className="w-5 h-5 text-purple-400" />
             Abstract
@@ -255,17 +254,17 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
 
       {/* Document Preview Placeholder */}
       {capstone.status === "approved" && capstone.pdf_url && (
-        <div className="glass rounded-2xl border border-white/10 p-6 md:p-8">
+        <div className="bg-[#1a1425]/80 backdrop-blur-xl rounded-2xl border border-[#2a2435] p-6 md:p-8">
           <h2 className="text-xl font-semibold text-white mb-4 flex items-center gap-2">
             <Eye className="w-5 h-5 text-cyan-400" />
             Document Preview
           </h2>
-          <div className="aspect-[4/3] bg-white/5 rounded-xl flex items-center justify-center border border-white/10">
+          <div className="aspect-[4/3] bg-[#0a0612] rounded-xl flex items-center justify-center border border-[#2a2435]">
             <div className="text-center">
-              <FileText className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-              <p className="text-muted-foreground mb-4">PDF Preview</p>
+              <FileText className="w-16 h-16 text-gray-500 mx-auto mb-4" />
+              <p className="text-gray-400 mb-4">PDF Preview</p>
               <Button
-                className="bg-gradient-to-r from-purple-600 to-cyan-500"
+                className="bg-gradient-to-r from-purple-600 to-cyan-500 text-white"
                 onClick={() => window.open(capstone.pdf_url!, "_blank")}
               >
                 <Eye className="w-4 h-4 mr-2" />

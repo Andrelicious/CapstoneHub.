@@ -3,6 +3,7 @@ import { createServerClient } from "@supabase/ssr"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import BrowseCapstones from "@/components/browse-capstones"
+import { ArrowLeft } from "lucide-react"
 
 async function getApprovedCapstones() {
   const cookieStore = await cookies()
@@ -38,6 +39,37 @@ async function getApprovedCapstones() {
   return capstones || []
 }
 
+async function getUserRole() {
+  const cookieStore = await cookies()
+
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value, options }) => {
+            cookieStore.set(name, value, options)
+          })
+        },
+      },
+    },
+  )
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) return null
+
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+
+  return profile?.role || null
+}
+
 function getFiltersFromData(capstones: any[]) {
   const categoriesSet = new Set<string>()
   const yearsSet = new Set<string>()
@@ -54,8 +86,18 @@ function getFiltersFromData(capstones: any[]) {
 }
 
 export default async function BrowsePage() {
-  const capstones = await getApprovedCapstones()
+  const [capstones, userRole] = await Promise.all([getApprovedCapstones(), getUserRole()])
   const { categories, years } = getFiltersFromData(capstones)
+
+  const getBackLink = () => {
+    if (userRole === "admin") return "/admin/dashboard"
+    if (userRole === "faculty") return "/faculty/dashboard"
+    if (userRole === "student") return "/student/dashboard"
+    return "/"
+  }
+
+  const backLink = getBackLink()
+  const backLabel = userRole ? "Back to Dashboard" : "Back to Home"
 
   return (
     <div className="min-h-screen bg-[#0a0612]">
@@ -69,6 +111,14 @@ export default async function BrowsePage() {
 
       <main className="relative pt-32 pb-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <a
+            href={backLink}
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            {backLabel}
+          </a>
+
           {/* Header */}
           <div className="text-center mb-12">
             <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">

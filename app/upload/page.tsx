@@ -10,7 +10,19 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { Upload, FileText, Users, Tag, BookOpen, X, Plus, CheckCircle2, AlertCircle, Loader2 } from "lucide-react"
+import {
+  Upload,
+  FileText,
+  Users,
+  Tag,
+  BookOpen,
+  X,
+  Plus,
+  CheckCircle2,
+  AlertCircle,
+  Loader2,
+  ArrowLeft,
+} from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 const categories = [
@@ -165,8 +177,51 @@ export default function UploadPage() {
     }
   }
 
+  const handleSaveDraft = async () => {
+    setIsLoading(true)
+    setError(null)
+
+    if (!userId) {
+      setError("You must be logged in to save a draft")
+      setIsLoading(false)
+      return
+    }
+
+    // For drafts, only title is required
+    if (!formData.title.trim()) {
+      setError("Please enter at least a project title to save as draft")
+      setIsLoading(false)
+      return
+    }
+
+    try {
+      const finalCategory = formData.category === "Other" ? customCategory.trim() : formData.category
+      const authorNames = formData.authors.filter((a) => a.name.trim()).map((a) => a.name.trim())
+
+      const { error: insertError } = await supabase.from("capstones").insert({
+        title: formData.title,
+        abstract: formData.abstract || null,
+        category: finalCategory || null,
+        year: Number.parseInt(formData.year),
+        keywords: formData.keywords.length > 0 ? formData.keywords : null,
+        authors: authorNames.length > 0 ? authorNames : null,
+        uploader_id: userId,
+        status: "draft",
+        pdf_url: file ? `/uploads/${file.name}` : null,
+      })
+
+      if (insertError) throw insertError
+
+      window.location.href = "/student/dashboard"
+    } catch (error: unknown) {
+      console.error("Save draft error:", error)
+      setError(error instanceof Error ? error.message : "Failed to save draft")
+      setIsLoading(false)
+    }
+  }
+
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-[#0a0612]">
       <Navbar />
 
       {/* Background Effects */}
@@ -177,12 +232,16 @@ export default function UploadPage() {
 
       <main className="relative z-10 pt-24 pb-16">
         <div className="container mx-auto px-4 max-w-4xl">
+          <a
+            href="/student/dashboard"
+            className="inline-flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-colors mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </a>
+
           {/* Header */}
           <div className="text-center mb-12">
-            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-purple-500/10 border border-purple-500/20 mb-6">
-              <Upload className="w-4 h-4 text-purple-400" />
-              <span className="text-sm text-purple-300">Upload Portal</span>
-            </div>
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 text-transparent bg-clip-text">
                 Submit Your Capstone
@@ -497,6 +556,7 @@ export default function UploadPage() {
                 type="button"
                 variant="outline"
                 disabled={isLoading}
+                onClick={handleSaveDraft}
                 className="h-12 px-8 bg-white/5 border-white/10 text-white hover:bg-white/10"
               >
                 Save as Draft

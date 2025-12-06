@@ -2,15 +2,12 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar, Eye, Check, X, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
-import { useToast } from "@/hooks/use-toast"
-
-const supabase = createClient()
 
 interface Capstone {
   id: string
@@ -20,6 +17,7 @@ interface Capstone {
   year: number
   created_at: string
   status: string
+  uploader_id?: string
 }
 
 interface FacultyPendingActionsProps {
@@ -29,136 +27,159 @@ interface FacultyPendingActionsProps {
 export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPendingActionsProps) {
   const [capstones, setCapstones] = useState(initialCapstones)
   const [processingId, setProcessingId] = useState<string | null>(null)
-  const { toast } = useToast()
+  const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
   const router = useRouter()
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
-  const handleApprove = async (e: React.MouseEvent, id: string) => {
+  const getSupabase = () => {
+    if (!supabaseRef.current) {
+      supabaseRef.current = createClient()
+    }
+    return supabaseRef.current
+  }
+
+  const handleUpdateStatus = async (e: React.MouseEvent, capstone: Capstone, newStatus: "approved" | "rejected") => {
     e.preventDefault()
     e.stopPropagation()
-    setProcessingId(id)
+    if (processingId) return
 
-    const { error } = await supabase.from("capstones").update({ status: "approved" }).eq("id", id)
+    setProcessingId(capstone.id)
+    setActionMessage(null)
+
+    const prevCapstones = capstones
+    setCapstones((prev) => prev.filter((c) => c.id !== capstone.id))
+
+    const supabase = getSupabase()
+    const { error } = await supabase.from("capstones").update({ status: newStatus }).eq("id", capstone.id)
 
     if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to approve capstone. Please try again.",
-        variant: "destructive",
-      })
+      setCapstones(prevCapstones)
+      setActionMessage({ type: "error", text: `Failed to ${newStatus}: ${error.message}` })
     } else {
-      setCapstones((prev) => prev.filter((c) => c.id !== id))
-      toast({
-        title: "Capstone Approved",
-        description: "The capstone has been approved and is now publicly visible.",
-      })
-      router.refresh()
+      // Create notification for the uploader
+      if (capstone.uploader_id) {
+        await supabase.from("notifications").insert({
+          user_id: capstone.uploader_id,
+          type: newStatus === "approved" ? "capstone_approved" : "capstone_rejected",
+          title: `Capstone ${newStatus}`,
+          description: `Your capstone "${capstone.title}" has been ${newStatus}.`,
+        })
+      }
+      setActionMessage({ type: "success", text: `Capstone ${newStatus} successfully` })
     }
+
     setProcessingId(null)
   }
 
-  const handleReject = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setProcessingId(id)
-
-    const { error } = await supabase.from("capstones").update({ status: "rejected" }).eq("id", id)
-
-    if (error) {
-      toast({
-        title: "Error",
-        description: "Failed to reject capstone. Please try again.",
-        variant: "destructive",
-      })
-    } else {
-      setCapstones((prev) => prev.filter((c) => c.id !== id))
-      toast({
-        title: "Capstone Rejected",
-        description: "The capstone has been rejected.",
-      })
-      router.refresh()
-    }
-    setProcessingId(null)
-  }
-
-  const handleReview = (e: React.MouseEvent, id: string) => {
-    e.preventDefault()
-    e.stopPropagation()
-    router.push(`/capstones/${id}`)
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    })
   }
 
   if (capstones.length === 0) {
     return (
-      <div className="text-center py-12">
-        <Check className="w-12 h-12 text-green-500 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-white mb-2">All caught up!</h3>
-        <p className="text-gray-400">No pending submissions to review</p>
+      <div className="text-center py-12 text-gray-400">
+        <Clock className="w-12 h-12 mx-auto mb-4 opacity-50" />
+        <p>No pending submissions</p>
       </div>
     )
   }
 
   return (
     <div className="space-y-4">
-      {capstones.map((capstone) => {
-        const isProcessing = processingId === capstone.id
-        return (
-          <div
-            key={capstone.id}
-            className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-yellow-500/30 transition-colors"
-          >
-            <div className="flex-1">
-              <div className="flex flex-wrap items-center gap-2 mb-2">
-                <Badge className="bg-yellow-500/20 border-yellow-500/30 text-yellow-400 border">
+      {actionMessage && (
+        <div
+          className={`p-3 rounded-lg text-sm ${
+            actionMessage.type === "success"
+              ? "bg-green-500/10 border border-green-500/20 text-green-400"
+              : "bg-red-500/10 border border-red-500/20 text-red-400"
+          }`}
+        >
+          {actionMessage.text}
+        </div>
+      )}
+
+      {capstones.map((capstone) => (
+        <div
+          key={capstone.id}
+          className="group p-4 rounded-xl bg-white/5 border border-white/10 hover:bg-white/10 hover:border-purple-500/30 transition-all duration-300"
+        >
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-2 flex-wrap">
+                <Badge variant="outline" className="text-xs border-purple-500/30 text-purple-400">
+                  {capstone.category}
+                </Badge>
+                <span className="text-xs text-gray-500 flex items-center gap-1">
+                  <Calendar className="w-3 h-3" />
+                  {capstone.year}
+                </span>
+                <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
                   <Clock className="w-3 h-3 mr-1" />
                   Pending
                 </Badge>
-                <span className="text-xs text-gray-400 flex items-center gap-1">
-                  <Calendar className="w-3 h-3" />
-                  {new Date(capstone.created_at).toLocaleDateString()}
-                </span>
               </div>
-              <h3 className="font-medium text-white mb-1">{capstone.title}</h3>
-              <p className="text-sm text-gray-400">
-                By {capstone.authors?.join(", ") || "Unknown"} | {capstone.category} | {capstone.year}
+
+              <h4 className="font-semibold text-white group-hover:text-purple-300 transition-colors truncate">
+                {capstone.title}
+              </h4>
+
+              <p className="text-sm text-gray-400 mt-1">
+                {capstone.authors?.join(", ") || "No authors"} • Submitted {formatDate(capstone.created_at)}
               </p>
             </div>
 
-            <div className="flex gap-2 relative z-10">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <Button
-                type="button"
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                className="bg-white/5 border-white/10 text-white hover:bg-white/10"
-                onClick={(e) => handleReview(e, capstone.id)}
-                disabled={isProcessing}
+                onClick={() => router.push(`/capstones/${capstone.id}`)}
+                className="text-gray-400 hover:text-white hover:bg-white/10"
               >
                 <Eye className="w-4 h-4 mr-1" />
-                Review
+                View
               </Button>
+
               <Button
-                type="button"
+                variant="ghost"
                 size="sm"
-                className="bg-green-600/80 hover:bg-green-600 text-white"
-                onClick={(e) => handleApprove(e, capstone.id)}
-                disabled={isProcessing}
+                onClick={(e) => handleUpdateStatus(e, capstone, "approved")}
+                disabled={processingId === capstone.id}
+                className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
               >
-                {isProcessing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Check className="w-4 h-4 mr-1" />}
-                Approve
+                {processingId === capstone.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Check className="w-4 h-4 mr-1" />
+                    Approve
+                  </>
+                )}
               </Button>
+
               <Button
-                type="button"
+                variant="ghost"
                 size="sm"
-                variant="outline"
-                className="bg-red-500/20 border-red-500/30 text-red-400 hover:bg-red-500/30"
-                onClick={(e) => handleReject(e, capstone.id)}
-                disabled={isProcessing}
+                onClick={(e) => handleUpdateStatus(e, capstone, "rejected")}
+                disabled={processingId === capstone.id}
+                className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
               >
-                {isProcessing ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <X className="w-4 h-4 mr-1" />}
-                Reject
+                {processingId === capstone.id ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <X className="w-4 h-4 mr-1" />
+                    Reject
+                  </>
+                )}
               </Button>
             </div>
           </div>
-        )
-      })}
+        </div>
+      ))}
     </div>
   )
 }

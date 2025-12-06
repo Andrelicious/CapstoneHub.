@@ -8,7 +8,6 @@ export async function GET(request: Request) {
   const errorDescription = searchParams.get("error_description")
 
   if (error) {
-    console.log("[v0] OAuth error:", error, errorDescription)
     return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(errorDescription || error)}`)
   }
 
@@ -17,38 +16,28 @@ export async function GET(request: Request) {
     const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
 
     if (exchangeError) {
-      console.log("[v0] Code exchange error:", exchangeError.message)
       return NextResponse.redirect(`${origin}/login?error=${encodeURIComponent(exchangeError.message)}`)
     }
 
     if (data.user) {
-      // Check if profile exists, if not create one
-      const { data: existingProfile } = await supabase
-        .from("profiles")
-        .select("id, role")
-        .eq("id", data.user.id)
-        .single()
+      // Check if profile exists, create if not
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
 
-      if (!existingProfile) {
-        // Create profile for OAuth user
-        const { error: profileError } = await supabase.from("profiles").insert({
+      if (!profile) {
+        await supabase.from("profiles").insert({
           id: data.user.id,
           email: data.user.email,
           display_name:
             data.user.user_metadata?.full_name || data.user.user_metadata?.name || data.user.email?.split("@")[0],
-          role: "student", // Default role for OAuth users
+          role: "student",
         })
-
-        if (profileError) {
-          console.log("[v0] Profile creation error:", profileError.message)
-        }
-
-        return NextResponse.redirect(`${origin}/student/dashboard?welcome=true`)
+        return NextResponse.redirect(`${origin}/student/dashboard`)
       }
 
-      if (existingProfile.role === "admin") {
+      const role = profile.role || "student"
+      if (role === "admin") {
         return NextResponse.redirect(`${origin}/admin/dashboard`)
-      } else if (existingProfile.role === "faculty") {
+      } else if (role === "faculty") {
         return NextResponse.redirect(`${origin}/faculty/dashboard`)
       } else {
         return NextResponse.redirect(`${origin}/student/dashboard`)
@@ -56,6 +45,5 @@ export async function GET(request: Request) {
     }
   }
 
-  // No code provided
   return NextResponse.redirect(`${origin}/login?error=no_code_provided`)
 }

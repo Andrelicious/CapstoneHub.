@@ -1,11 +1,14 @@
+"use client"
+
 import Link from "next/link"
-import { redirect } from "next/navigation"
-import { cookies } from "next/headers"
-import { createServerClient } from "@supabase/ssr"
+import { useEffect, useState } from "react"
+import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 import Footer from "@/components/footer"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { StudentProfileMenu } from "@/components/student-profile-menu"
+import { NotificationDropdown } from "@/components/notification-dropdown"
 import {
   Upload,
   BookOpen,
@@ -39,51 +42,72 @@ const statusConfig = {
   },
 }
 
-export default async function StudentDashboardPage() {
-  const cookieStore = await cookies()
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-          } catch {}
-        },
-      },
-    },
-  )
+export default function StudentDashboardPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [session, setSession] = useState<any>(null)
+  const [profile, setProfile] = useState<any>(null)
+  const [capstones, setCapstones] = useState<any[]>([])
 
-  const {
-    data: { session },
-  } = await supabase.auth.getSession()
-  if (!session) {
-    redirect("/login")
+  useEffect(() => {
+    async function loadData() {
+      const supabase = createClient()
+
+      const {
+        data: { session: authSession },
+      } = await supabase.auth.getSession()
+      if (!authSession) {
+        router.push("/login")
+        return
+      }
+
+      setSession(authSession)
+
+      const { data: profileData } = await supabase.from("profiles").select("*").eq("id", authSession.user.id).single()
+
+      const role = profileData?.role || "student"
+      if (role === "admin") {
+        router.push("/admin/dashboard")
+        return
+      } else if (role === "faculty") {
+        router.push("/faculty/dashboard")
+        return
+      }
+
+      setProfile(profileData)
+
+      const { data: capstonesData } = await supabase
+        .from("capstones")
+        .select("*")
+        .eq("uploader_id", authSession.user.id)
+        .order("created_at", { ascending: false })
+
+      setCapstones(capstonesData || [])
+      setLoading(false)
+    }
+    loadData()
+  }, [router])
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#0a0612] flex items-center justify-center">
+        <div className="w-8 h-8 border-4 border-purple-500/30 border-t-purple-500 rounded-full animate-spin" />
+      </div>
+    )
   }
 
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", session.user.id).single()
-
   const displayName =
-    profile?.display_name || session.user.user_metadata?.display_name || session.user.email?.split("@")[0] || "Student"
-  const studentId = profile?.organization || session.user.user_metadata?.student_id || "Not set"
-
-  const { data: capstones } = await supabase
-    .from("capstones")
-    .select("*")
-    .eq("uploader_id", session.user.id)
-    .order("created_at", { ascending: false })
-
-  const userCapstones = capstones || []
+    profile?.display_name ||
+    session?.user.user_metadata?.display_name ||
+    session?.user.email?.split("@")[0] ||
+    "Student"
+  const studentId = profile?.organization || session?.user.user_metadata?.student_id || ""
 
   const stats = {
-    total: userCapstones.length,
-    pending: userCapstones.filter((c) => c.status === "pending").length,
-    approved: userCapstones.filter((c) => c.status === "approved").length,
-    rejected: userCapstones.filter((c) => c.status === "rejected").length,
+    total: capstones.length,
+    pending: capstones.filter((c) => c.status === "pending").length,
+    approved: capstones.filter((c) => c.status === "approved").length,
+    rejected: capstones.filter((c) => c.status === "rejected").length,
   }
 
   return (
@@ -118,8 +142,11 @@ export default async function StudentDashboardPage() {
               </Link>
             </nav>
 
-            {/* Profile Menu */}
-            <StudentProfileMenu />
+            {/* Notification bell and Profile Menu */}
+            <div className="flex items-center gap-3">
+              {session && <NotificationDropdown userId={session.user.id} userRole={profile?.role || "student"} />}
+              <StudentProfileMenu />
+            </div>
           </div>
         </div>
       </header>
@@ -140,7 +167,7 @@ export default async function StudentDashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-purple-400">Student Dashboard</p>
-                <p className="text-xs text-gray-500">ID: {studentId}</p>
+                {studentId && <p className="text-xs text-gray-500">ID: {studentId}</p>}
               </div>
             </div>
             <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
@@ -249,7 +276,7 @@ export default async function StudentDashboardPage() {
               </Link>
             </div>
 
-            {userCapstones.length === 0 ? (
+            {capstones.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-white mb-2">No capstones yet</h3>
@@ -263,7 +290,7 @@ export default async function StudentDashboardPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {userCapstones.map((capstone) => (
+                {capstones.map((capstone) => (
                   <div
                     key={capstone.id}
                     className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-colors"

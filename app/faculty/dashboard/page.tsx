@@ -1,4 +1,3 @@
-import Link from "next/link"
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
@@ -44,6 +43,9 @@ export default async function FacultyDashboardPage() {
     redirect("/student/dashboard")
   }
 
+  const isAdmin = userRole === "admin"
+  const dashboardTitle = isAdmin ? "Admin Dashboard" : "Faculty Dashboard"
+
   const displayName =
     profile?.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "Faculty"
 
@@ -82,6 +84,19 @@ export default async function FacultyDashboardPage() {
     totalStudents: studentProfiles.length,
   }
 
+  let notificationCount = 0
+  try {
+    const { count } = await dataSupabase
+      .from("notifications")
+      .select("*", { count: "exact", head: true })
+      .or(`target_role.eq.faculty,target_role.eq.admin`)
+      .eq("is_read", false)
+    notificationCount = count || 0
+  } catch (e) {
+    // Notifications table might not exist yet
+    notificationCount = pendingCapstones.length
+  }
+
   return (
     <div className="min-h-screen bg-[#0a0612]">
       <Navbar />
@@ -101,7 +116,7 @@ export default async function FacultyDashboardPage() {
                 <Shield className="w-6 h-6 text-white" />
               </div>
               <div>
-                <p className="text-sm text-purple-400">Faculty Dashboard</p>
+                <p className="text-sm text-purple-400">{dashboardTitle}</p>
                 <p className="text-xs text-gray-500">Review & Management</p>
               </div>
             </div>
@@ -169,7 +184,7 @@ export default async function FacultyDashboardPage() {
 
           {/* Quick Actions */}
           <div className="grid md:grid-cols-2 gap-6 mb-10">
-            <Link href="/browse">
+            <a href="/browse" className="block">
               <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6 hover:border-purple-500/50 transition-all duration-300 cursor-pointer">
                 <div className="flex items-center gap-4">
                   <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-purple-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -184,24 +199,26 @@ export default async function FacultyDashboardPage() {
                   <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-purple-400 group-hover:translate-x-1 transition-all" />
                 </div>
               </div>
-            </Link>
+            </a>
 
-            <Link href="/admin/dashboard">
-              <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6 hover:border-cyan-500/50 transition-all duration-300 cursor-pointer">
-                <div className="flex items-center gap-4">
-                  <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
-                    <TrendingUp className="w-7 h-7 text-white" />
+            {isAdmin && (
+              <a href="/admin/dashboard" className="block">
+                <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6 hover:border-cyan-500/50 transition-all duration-300 cursor-pointer">
+                  <div className="flex items-center gap-4">
+                    <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
+                      <TrendingUp className="w-7 h-7 text-white" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="text-xl font-semibold text-white group-hover:text-cyan-300 transition-colors">
+                        Admin Panel
+                      </h3>
+                      <p className="text-gray-400">Full management controls</p>
+                    </div>
+                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
                   </div>
-                  <div className="flex-1">
-                    <h3 className="text-xl font-semibold text-white group-hover:text-cyan-300 transition-colors">
-                      Admin Panel
-                    </h3>
-                    <p className="text-gray-400">Full management controls</p>
-                  </div>
-                  <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
                 </div>
-              </div>
-            </Link>
+              </a>
+            )}
           </div>
 
           {/* Pending Submissions */}

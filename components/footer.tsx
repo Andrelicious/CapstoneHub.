@@ -1,4 +1,56 @@
+"use client"
+
+import { useEffect, useState, useRef } from "react"
+import { createClient } from "@/lib/supabase/client"
+
 export default function Footer() {
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [role, setRole] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
+
+  const getSupabase = () => {
+    if (!supabaseRef.current) {
+      supabaseRef.current = createClient()
+    }
+    return supabaseRef.current
+  }
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = getSupabase()
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      if (session?.user) {
+        setIsAuthenticated(true)
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single()
+        setRole(profile?.role || "student")
+      } else {
+        setIsAuthenticated(false)
+        setRole(null)
+      }
+      setLoading(false)
+    }
+    checkAuth()
+  }, [])
+
+  const handleLogout = async () => {
+    const supabase = getSupabase()
+    await supabase.auth.signOut()
+    window.location.href = "/"
+  }
+
+  const getDashboardPath = () => {
+    if (role === "admin") return "/admin/dashboard"
+    if (role === "faculty") return "/faculty/dashboard"
+    return "/student/dashboard"
+  }
+
+  const navigate = (path: string) => {
+    window.location.href = path
+  }
+
   return (
     <footer className="relative border-t border-white/10">
       {/* Gradient line */}
@@ -27,21 +79,74 @@ export default function Footer() {
             <p className="text-gray-600 text-sm mt-6">© 2025 Capstone Hub. College of Computer Studies.</p>
           </div>
 
-          {/* Quick Links */}
+          {/* Quick Links - Auth Aware */}
           <div className="md:text-right">
             <h4 className="text-white font-semibold mb-6">Quick Links</h4>
             <ul className="space-y-3">
-              {["Browse Projects", "Login", "Register", "Contact Us"].map((link) => (
-                <li key={link}>
-                  <a
-                    href="#"
-                    className="text-gray-400 hover:text-purple-400 transition-colors duration-300 inline-flex items-center gap-2 group"
-                  >
-                    <span className="w-0 h-px bg-gradient-to-r from-purple-500 to-cyan-500 group-hover:w-4 transition-all duration-300" />
-                    {link}
-                  </a>
-                </li>
-              ))}
+              <li>
+                <button
+                  onClick={() => navigate("/browse")}
+                  className="text-gray-400 hover:text-purple-400 transition-colors duration-300 inline-flex items-center gap-2 group"
+                >
+                  <span className="w-0 h-px bg-gradient-to-r from-purple-500 to-cyan-500 group-hover:w-4 transition-all duration-300" />
+                  Browse Projects
+                </button>
+              </li>
+
+              {!loading && !isAuthenticated && (
+                <>
+                  <li>
+                    <button
+                      onClick={() => navigate("/login")}
+                      className="text-gray-400 hover:text-purple-400 transition-colors duration-300 inline-flex items-center gap-2 group"
+                    >
+                      <span className="w-0 h-px bg-gradient-to-r from-purple-500 to-cyan-500 group-hover:w-4 transition-all duration-300" />
+                      Login
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => navigate("/register")}
+                      className="text-gray-400 hover:text-purple-400 transition-colors duration-300 inline-flex items-center gap-2 group"
+                    >
+                      <span className="w-0 h-px bg-gradient-to-r from-purple-500 to-cyan-500 group-hover:w-4 transition-all duration-300" />
+                      Register
+                    </button>
+                  </li>
+                </>
+              )}
+
+              {!loading && isAuthenticated && (
+                <>
+                  <li>
+                    <button
+                      onClick={() => navigate(getDashboardPath())}
+                      className="text-gray-400 hover:text-purple-400 transition-colors duration-300 inline-flex items-center gap-2 group"
+                    >
+                      <span className="w-0 h-px bg-gradient-to-r from-purple-500 to-cyan-500 group-hover:w-4 transition-all duration-300" />
+                      Dashboard
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={() => navigate("/profile")}
+                      className="text-gray-400 hover:text-purple-400 transition-colors duration-300 inline-flex items-center gap-2 group"
+                    >
+                      <span className="w-0 h-px bg-gradient-to-r from-purple-500 to-cyan-500 group-hover:w-4 transition-all duration-300" />
+                      Profile
+                    </button>
+                  </li>
+                  <li>
+                    <button
+                      onClick={handleLogout}
+                      className="text-red-400 hover:text-red-300 transition-colors duration-300 inline-flex items-center gap-2 group"
+                    >
+                      <span className="w-0 h-px bg-gradient-to-r from-red-500 to-orange-500 group-hover:w-4 transition-all duration-300" />
+                      Logout
+                    </button>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
         </div>

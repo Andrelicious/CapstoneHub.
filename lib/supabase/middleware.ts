@@ -30,16 +30,27 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register")) {
+    const url = request.nextUrl.clone()
+    url.pathname = "/"
+    return NextResponse.redirect(url)
+  }
+
   // Redirect unauthenticated users to login for protected routes
   if (
     !user &&
     !request.nextUrl.pathname.startsWith("/login") &&
     !request.nextUrl.pathname.startsWith("/register") &&
     !request.nextUrl.pathname.startsWith("/browse") &&
+    !request.nextUrl.pathname.startsWith("/capstones") &&
+    !request.nextUrl.pathname.startsWith("/auth") &&
     request.nextUrl.pathname !== "/" &&
     (request.nextUrl.pathname.startsWith("/dashboard") ||
       request.nextUrl.pathname.startsWith("/upload") ||
-      request.nextUrl.pathname.startsWith("/admin"))
+      request.nextUrl.pathname.startsWith("/student") ||
+      request.nextUrl.pathname.startsWith("/faculty") ||
+      request.nextUrl.pathname.startsWith("/admin") ||
+      request.nextUrl.pathname.startsWith("/notifications"))
   ) {
     const url = request.nextUrl.clone()
     url.pathname = "/login"

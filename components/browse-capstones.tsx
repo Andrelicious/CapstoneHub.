@@ -112,9 +112,29 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
     })
   }
 
-  const handleDownload = (pdfUrl: string | null, title: string) => {
+  const handleDownload = async (pdfUrl: string | null, title: string) => {
     if (pdfUrl) {
-      window.open(pdfUrl, "_blank")
+      try {
+        const response = await fetch(pdfUrl)
+        const blob = await response.blob()
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement("a")
+        a.href = url
+        a.download = `${title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } catch (error) {
+        // Fallback: use download attribute approach
+        const a = document.createElement("a")
+        a.href = pdfUrl
+        a.download = `${title.replace(/[^a-zA-Z0-9]/g, "_")}.pdf`
+        a.target = "_self"
+        document.body.appendChild(a)
+        a.click()
+        document.body.removeChild(a)
+      }
     } else {
       toast({
         title: "Download unavailable",
