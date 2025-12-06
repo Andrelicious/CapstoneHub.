@@ -25,10 +25,27 @@ export async function updateSession(request: NextRequest) {
     },
   )
 
-  // Refresh session - IMPORTANT: Do not remove this
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  let user = null
+  try {
+    const { data, error } = await supabase.auth.getUser()
+    if (error) {
+      // Session is invalid/stale - clear auth cookies
+      const cookiesToClear = request.cookies
+        .getAll()
+        .filter((c) => c.name.includes("supabase") || c.name.includes("sb-"))
+      cookiesToClear.forEach((cookie) => {
+        supabaseResponse.cookies.delete(cookie.name)
+      })
+    } else {
+      user = data.user
+    }
+  } catch {
+    // Session fetch failed - clear auth cookies
+    const cookiesToClear = request.cookies.getAll().filter((c) => c.name.includes("supabase") || c.name.includes("sb-"))
+    cookiesToClear.forEach((cookie) => {
+      supabaseResponse.cookies.delete(cookie.name)
+    })
+  }
 
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register")) {
     const url = request.nextUrl.clone()
