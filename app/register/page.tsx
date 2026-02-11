@@ -16,19 +16,16 @@ const roleOptions: { value: UserRole; label: string; description: string; icon: 
   {
     value: "student",
     label: "Student",
-    description: "Upload and manage your capstone or thesis submissions",
     icon: GraduationCap,
   },
   {
     value: "adviser",
     label: "Adviser",
-    description: "Review submissions, provide feedback, and recommend approval",
     icon: Users,
   },
   {
     value: "admin",
     label: "Admin",
-    description: "Manage users, repository records, approvals, and reports",
     icon: Shield,
   },
 ]
