@@ -52,30 +52,30 @@ async function getSubmissionData(id: string) {
     return { redirect: '/student/dashboard' }
   }
 
-  const { data: submission } = await supabase.from('capstones').select('*').eq('id', id).single()
+  const { data: dataset } = await supabase
+    .from('datasets')
+    .select('*, profiles(display_name), ocr_results(*)')
+    .eq('id', id)
+    .single()
 
-  if (!submission) {
+  if (!dataset) {
     return { redirect: '/admin/dashboard', notFound: true }
   }
 
-  // Transform capstone data to submission format
+  // Transform dataset to submission format
   const transformedSubmission = {
-    id: submission.id,
-    title: submission.title || '',
-    program: submission.category || 'General',
-    document_type: 'Capstone Project',
-    student_id: submission.user_id || '',
-    student_name: submission.authors?.[0] || submission.author_name || 'Unknown',
-    submitted_date: submission.created_at,
-    status: 'pending_admin_review' as const,
-    preview_text:
-      submission.abstract ||
-      `This is a capstone project titled "${submission.title}" in the ${submission.category} program.`,
-    full_ocr_text:
-      submission.abstract ||
-      `Abstract: This is a capstone project titled "${submission.title}" in the ${submission.category} program. This is the full OCR extracted text of the document.`,
-    quality_flags: [],
-    file_url: undefined,
+    id: dataset.id,
+    title: dataset.title || '',
+    program: dataset.program || 'General',
+    document_type: dataset.doc_type || 'Capstone Project',
+    student_id: dataset.user_id || '',
+    student_name: dataset.profiles?.display_name || 'Unknown',
+    submitted_date: dataset.created_at,
+    status: dataset.status as 'pending_admin_review',
+    preview_text: dataset.ocr_results?.preview_text || dataset.description || 'No OCR preview available',
+    full_ocr_text: dataset.ocr_results?.full_text || 'No OCR text extracted yet',
+    quality_flags: dataset.ocr_results?.quality_flags ? Object.keys(dataset.ocr_results.quality_flags) : [],
+    file_url: dataset.file_path ? `/storage/download/${dataset.file_path}` : undefined,
   }
 
   return { submission: transformedSubmission }

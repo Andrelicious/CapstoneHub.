@@ -21,22 +21,26 @@ import {
   Eye,
 } from "lucide-react"
 
-interface Capstone {
+interface Dataset {
   id: string
   title: string
-  abstract: string | null
-  authors: string[] | null
-  year: number | null
+  description: string | null
+  user_id: string
+  program: string | null
+  doc_type: string | null
+  school_year: string | null
   category: string | null
-  keywords: string[] | null
-  pdf_url: string | null
-  thumbnail_url: string | null
+  tags: string[] | null
+  file_path: string | null
+  file_name: string | null
   status: string
   created_at: string
+  approved_at: string | null
+  profiles?: { display_name: string; id: string }
 }
 
 interface BrowseCapstonesProps {
-  initialCapstones: Capstone[]
+  initialCapstones: Dataset[]
   categories: string[]
   years: string[]
 }
@@ -48,23 +52,33 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
   const [searchQuery, setSearchQuery] = useState("")
   const [selectedCategory, setSelectedCategory] = useState("All Categories")
   const [selectedYear, setSelectedYear] = useState("All Years")
+  const [selectedProgram, setSelectedProgram] = useState("All Programs")
   const [showFilters, setShowFilters] = useState(false)
   const [sortBy, setSortBy] = useState<SortOption>("recent")
   const [viewMode, setViewMode] = useState<ViewMode>("list")
   const [favorites, setFavorites] = useState<Set<string>>(new Set())
   const { toast } = useToast()
 
+  // Get unique programs from datasets
+  const programs = useMemo(() => {
+    const programsSet = new Set<string>()
+    initialCapstones.forEach((d) => {
+      if (d.program) programsSet.add(d.program)
+    })
+    return ["All Programs", ...Array.from(programsSet).sort()]
+  }, [initialCapstones])
+
   const filteredAndSortedCapstones = useMemo(() => {
-    const result = initialCapstones.filter((capstone) => {
+    const result = initialCapstones.filter((dataset) => {
       const matchesSearch =
         searchQuery === "" ||
-        capstone.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (capstone.authors && capstone.authors.some((a) => a.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-        (capstone.keywords && capstone.keywords.some((k) => k.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-        (capstone.abstract && capstone.abstract.toLowerCase().includes(searchQuery.toLowerCase()))
-      const matchesCategory = selectedCategory === "All Categories" || capstone.category === selectedCategory
-      const matchesYear = selectedYear === "All Years" || capstone.year?.toString() === selectedYear
-      return matchesSearch && matchesCategory && matchesYear
+        dataset.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (dataset.tags && dataset.tags.some((a) => a.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+        (dataset.description && dataset.description.toLowerCase().includes(searchQuery.toLowerCase()))
+      const matchesCategory = selectedCategory === "All Categories" || dataset.category === selectedCategory
+      const matchesYear = selectedYear === "All Years" || dataset.school_year === selectedYear
+      const matchesProgram = selectedProgram === "All Programs" || dataset.program === selectedProgram
+      return matchesSearch && matchesCategory && matchesYear && matchesProgram
     })
 
     result.sort((a, b) => {
@@ -83,12 +97,13 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
     })
 
     return result
-  }, [initialCapstones, searchQuery, selectedCategory, selectedYear, sortBy])
+  }, [initialCapstones, searchQuery, selectedCategory, selectedYear, selectedProgram, sortBy])
 
   const clearFilters = () => {
     setSearchQuery("")
     setSelectedCategory("All Categories")
     setSelectedYear("All Years")
+    setSelectedProgram("All Programs")
     setSortBy("recent")
   }
 
@@ -393,10 +408,10 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                         {capstone.category}
                       </Badge>
                     )}
-                    {capstone.year && (
+                    {capstone.school_year && (
                       <div className="flex items-center gap-1 text-sm text-gray-400">
                         <Calendar className="w-4 h-4" />
-                        {capstone.year}
+                        {capstone.school_year}
                       </div>
                     )}
                     <Badge
@@ -413,27 +428,27 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                     </h3>
                   </Link>
 
-                  {capstone.authors && capstone.authors.length > 0 && (
+                  {capstone.profiles && capstone.profiles.length > 0 && (
                     <div className="flex items-center gap-2 text-sm text-gray-400 mb-4">
                       <User className="w-4 h-4" />
-                      {capstone.authors.join(", ")}
+                      {capstone.profiles.map((profile) => profile.display_name).join(", ")}
                     </div>
                   )}
 
-                  {capstone.abstract && <p className="text-gray-400 line-clamp-2 mb-4">{capstone.abstract}</p>}
+                  {capstone.description && <p className="text-gray-400 line-clamp-2 mb-4">{capstone.description}</p>}
 
-                  {capstone.keywords && capstone.keywords.length > 0 && (
+                  {capstone.tags && capstone.tags.length > 0 && (
                     <div className="flex flex-wrap gap-2">
-                      {capstone.keywords.slice(0, 4).map((keyword, idx) => (
+                      {capstone.tags.slice(0, 4).map((tag, idx) => (
                         <span
                           key={idx}
                           className="text-xs px-2 py-1 bg-[#0a0612] border border-[#2a2435] rounded-md text-gray-400"
                         >
-                          {keyword}
+                          {tag}
                         </span>
                       ))}
-                      {capstone.keywords.length > 4 && (
-                        <span className="text-xs px-2 py-1 text-gray-500">+{capstone.keywords.length - 4} more</span>
+                      {capstone.tags.length > 4 && (
+                        <span className="text-xs px-2 py-1 text-gray-500">+{capstone.tags.length - 4} more</span>
                       )}
                     </div>
                   )}
@@ -450,7 +465,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                   <Button
                     variant="outline"
                     className="flex-1 lg:flex-none bg-[#0a0612] border-[#2a2435] text-white hover:bg-[#1a1425]"
-                    onClick={() => handleDownload(capstone.pdf_url, capstone.title)}
+                    onClick={() => handleDownload(capstone.file_path, capstone.title)}
                   >
                     <Download className="w-4 h-4 mr-2" />
                     Download
@@ -502,10 +517,10 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                       {capstone.category}
                     </Badge>
                   )}
-                  {capstone.year && (
+                  {capstone.school_year && (
                     <span className="text-xs text-gray-500 flex items-center gap-1">
                       <Calendar className="w-3 h-3" />
-                      {capstone.year}
+                      {capstone.school_year}
                     </span>
                   )}
                 </div>
@@ -516,15 +531,15 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                   </h3>
                 </Link>
 
-                {capstone.authors && capstone.authors.length > 0 && (
+                {capstone.profiles && capstone.profiles.length > 0 && (
                   <p className="text-sm text-gray-400 mb-3 line-clamp-1">
                     <User className="w-3 h-3 inline mr-1" />
-                    {capstone.authors.join(", ")}
+                    {capstone.profiles.map((profile) => profile.display_name).join(", ")}
                   </p>
                 )}
 
-                {capstone.abstract && (
-                  <p className="text-sm text-gray-500 line-clamp-2 mb-4 flex-1">{capstone.abstract}</p>
+                {capstone.description && (
+                  <p className="text-sm text-gray-500 line-clamp-2 mb-4 flex-1">{capstone.description}</p>
                 )}
 
                 {/* Actions */}
@@ -542,7 +557,7 @@ export default function BrowseCapstones({ initialCapstones, categories, years }:
                     size="sm"
                     variant="outline"
                     className="bg-[#0a0612] border-[#2a2435] text-white hover:bg-[#1a1425]"
-                    onClick={() => handleDownload(capstone.pdf_url, capstone.title)}
+                    onClick={() => handleDownload(capstone.file_path, capstone.title)}
                   >
                     <Download className="w-4 h-4" />
                   </Button>

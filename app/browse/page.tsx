@@ -5,7 +5,7 @@ import Footer from "@/components/footer"
 import BrowseCapstones from "@/components/browse-capstones"
 import { ArrowLeft } from "lucide-react"
 
-async function getApprovedCapstones() {
+async function getApprovedDatasets() {
   const cookieStore = await cookies()
 
   const supabase = createServerClient(
@@ -25,18 +25,18 @@ async function getApprovedCapstones() {
     },
   )
 
-  const { data: capstones, error } = await supabase
-    .from("capstones")
-    .select("*")
+  const { data: datasets, error } = await supabase
+    .from("datasets")
+    .select(`*, profiles(display_name, id)`)
     .eq("status", "approved")
-    .order("created_at", { ascending: false })
+    .order("approved_at", { ascending: false })
 
   if (error) {
-    console.error("Error fetching capstones:", error)
+    console.error("Error fetching datasets:", error)
     return []
   }
 
-  return capstones || []
+  return datasets || []
 }
 
 async function getUserRole() {
@@ -70,13 +70,15 @@ async function getUserRole() {
   return profile?.role || null
 }
 
-function getFiltersFromData(capstones: any[]) {
+function getFiltersFromData(datasets: any[]) {
   const categoriesSet = new Set<string>()
+  const programsSet = new Set<string>()
   const yearsSet = new Set<string>()
 
-  capstones.forEach((c) => {
-    if (c.category) categoriesSet.add(c.category)
-    if (c.year) yearsSet.add(c.year.toString())
+  datasets.forEach((d) => {
+    if (d.category) categoriesSet.add(d.category)
+    if (d.program) programsSet.add(d.program)
+    if (d.school_year) yearsSet.add(d.school_year)
   })
 
   const categories = ["All Categories", ...Array.from(categoriesSet).sort()]
@@ -86,8 +88,8 @@ function getFiltersFromData(capstones: any[]) {
 }
 
 export default async function BrowsePage() {
-  const [capstones, userRole] = await Promise.all([getApprovedCapstones(), getUserRole()])
-  const { categories, years } = getFiltersFromData(capstones)
+  const [datasets, userRole] = await Promise.all([getApprovedDatasets(), getUserRole()])
+  const { categories, years } = getFiltersFromData(datasets)
 
   const getBackLink = () => {
     if (userRole === "admin") return "/admin/dashboard"
@@ -132,7 +134,7 @@ export default async function BrowsePage() {
             </p>
           </div>
 
-          <BrowseCapstones initialCapstones={capstones} categories={categories} years={years} />
+          <BrowseCapstones initialCapstones={datasets} categories={categories} years={years} />
         </div>
       </main>
 

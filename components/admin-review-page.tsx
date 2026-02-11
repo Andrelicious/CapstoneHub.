@@ -1,28 +1,14 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
-import Navbar from '@/components/navbar'
-import Footer from '@/components/footer'
-import { RoleGuard } from '@/components/RoleGuard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { SubmissionStatusBadge } from './submission-status-badge'
-import { RemarksModal } from './remarks-modal'
-import {
-  Check,
-  X,
-  RotateCcw,
-  Download,
-  Search,
-  FileText,
-  AlertCircle,
-  Loader2,
-} from 'lucide-react'
+import { Check, X, RotateCcw, Download, Search, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import {
   AlertDialog,
@@ -34,6 +20,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
+import { approveDataset, returnDataset, rejectDataset } from '@/lib/datasets-actions'
 
 interface Submission {
   id: string
@@ -57,351 +44,315 @@ interface AdminReviewPageProps {
 export function AdminReviewPage({ submission }: AdminReviewPageProps) {
   const router = useRouter()
   const { toast } = useToast()
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
-  const [returnModalOpen, setReturnModalOpen] = useState(false)
-  const [rejectModalOpen, setRejectModalOpen] = useState(false)
-  const [approveDialogOpen, setApproveDialogOpen] = useState(false)
-
-  const getSupabase = () => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient()
-    }
-    return supabaseRef.current
-  }
-
-  const handleReturn = async (remarks: string) => {
-    setIsLoading(true)
-    const supabase = getSupabase()
-
-    const { error } = await supabase
-      .from('capstones')
-      .update({
-        status: 'returned',
-        admin_remarks: remarks,
-      })
-      .eq('id', submission.id)
-
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to return submission for revision',
-        variant: 'destructive',
-      })
-    } else {
-      toast({
-        title: 'Returned',
-        description: 'Submission has been returned to student for revision',
-      })
-      setReturnModalOpen(false)
-      router.push('/admin/dashboard')
-    }
-    setIsLoading(false)
-  }
-
-  const handleReject = async (remarks: string) => {
-    setIsLoading(true)
-    const supabase = getSupabase()
-
-    const { error } = await supabase
-      .from('capstones')
-      .update({
-        status: 'rejected',
-        admin_remarks: remarks,
-      })
-      .eq('id', submission.id)
-
-    if (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to reject submission',
-        variant: 'destructive',
-      })
-    } else {
-      toast({
-        title: 'Rejected',
-        description: 'Submission has been rejected',
-      })
-      setRejectModalOpen(false)
-      router.push('/admin/dashboard')
-    }
-    setIsLoading(false)
-  }
+  const [remarks, setRemarks] = useState('')
+  const [action, setAction] = useState<'return' | 'reject' | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   const handleApprove = async () => {
     setIsLoading(true)
-    const supabase = getSupabase()
-
-    const { error } = await supabase
-      .from('capstones')
-      .update({
-        status: 'approved',
+    try {
+      await approveDataset(submission.id)
+      toast({
+        title: 'Success',
+        description: 'Dataset approved successfully',
       })
-      .eq('id', submission.id)
-
-    if (error) {
+      router.push('/admin/dashboard')
+    } catch (error: any) {
       toast({
         title: 'Error',
-        description: 'Failed to approve submission',
+        description: error.message,
         variant: 'destructive',
       })
-    } else {
-      toast({
-        title: 'Approved',
-        description: 'Submission has been approved',
-      })
-      setApproveDialogOpen(false)
-      router.push('/admin/dashboard')
+    } finally {
+      setIsLoading(false)
     }
-    setIsLoading(false)
   }
 
-  const highlightSearchResults = (text: string) => {
-    if (!searchText) return text
+  const handleReturn = async () => {
+    if (!remarks.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide remarks before returning',
+        variant: 'destructive',
+      })
+      return
+    }
 
-    const parts = text.split(new RegExp(`(${searchText})`, 'gi'))
-    return (
-      <span>
-        {parts.map((part, i) =>
-          part.toLowerCase() === searchText.toLowerCase() ? (
-            <span key={i} className="bg-yellow-500/30 text-yellow-200">
-              {part}
-            </span>
-          ) : (
-            part
-          ),
-        )}
-      </span>
-    )
+    setIsLoading(true)
+    try {
+      await returnDataset(submission.id, remarks)
+      toast({
+        title: 'Success',
+        description: 'Dataset returned to student',
+      })
+      router.push('/admin/dashboard')
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  const handleReject = async () => {
+    if (!remarks.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please provide remarks before rejecting',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    setIsLoading(true)
+    try {
+      await rejectDataset(submission.id, remarks)
+      toast({
+        title: 'Success',
+        description: 'Dataset rejected',
+      })
+      router.push('/admin/dashboard')
+    } catch (error: any) {
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive',
+      })
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
+  // Highlight search results in text
+  const highlightText = (text: string) => {
+    if (!searchText.trim()) return text
+
+    const regex = new RegExp(`(${searchText.trim()})`, 'gi')
+    return text.replace(regex, '<mark>$1</mark>')
   }
 
   return (
-    <RoleGuard allowedRoles={['admin']}>
-      <div className="min-h-screen bg-background">
-        <Navbar />
+    <div className="min-h-screen bg-[#0a0612]">
+      {/* Background effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px]" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[150px]" />
+      </div>
 
-        <main className="relative pt-32 pb-20">
-          <div className="max-w-7xl mx-auto px-6 lg:px-8">
-            {/* Back Button */}
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => router.back()}
-              className="mb-6 border-white/20 hover:bg-white/10"
-            >
-              ← Back to Dashboard
-            </Button>
+      <main className="relative pt-20 pb-20">
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          {/* Back button */}
+          <button
+            onClick={() => router.back()}
+            className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors mb-6"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back to Dashboard
+          </button>
 
-            {/* Two Column Layout */}
-            <div className="grid lg:grid-cols-3 gap-6">
-              {/* Left Panel - Submission Details */}
-              <div className="lg:col-span-1 space-y-4">
-                <Card className="bg-card/50 backdrop-blur border-white/10">
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Left Column: Submission Info */}
+            <div className="lg:col-span-1 space-y-6">
+              <Card className="bg-white/5 backdrop-blur border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white">Submission Info</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div>
+                    <p className="text-gray-400 text-sm">Title</p>
+                    <p className="text-white font-medium">{submission.title}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Student</p>
+                    <p className="text-white font-medium">{submission.student_name}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Program</p>
+                    <p className="text-white font-medium">{submission.program}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Type</p>
+                    <p className="text-white font-medium">{submission.document_type}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-400 text-sm">Submitted</p>
+                    <p className="text-white font-medium">
+                      {new Date(submission.submitted_date).toLocaleDateString()}
+                    </p>
+                  </div>
+                  {submission.file_url && (
+                    <Button variant="outline" className="w-full border-white/20 hover:bg-white/10 bg-transparent" asChild>
+                      <a href={submission.file_url} download>
+                        <Download className="w-4 h-4 mr-2" />
+                        Download File
+                      </a>
+                    </Button>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Quality Flags */}
+              {submission.quality_flags && submission.quality_flags.length > 0 && (
+                <Card className="bg-orange-500/10 border-orange-500/20">
                   <CardHeader>
-                    <CardTitle className="text-white">{submission.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Program</p>
-                      <p className="text-white">{submission.program}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Document Type</p>
-                      <p className="text-white">{submission.document_type}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Student</p>
-                      <p className="text-white">{submission.student_name}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Submitted</p>
-                      <p className="text-white">{new Date(submission.submitted_date).toLocaleDateString()}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs font-medium text-muted-foreground mb-1">Status</p>
-                      <SubmissionStatusBadge status={submission.status} />
-                    </div>
-
-                    {/* Files Section */}
-                    <div className="pt-4 border-t border-white/10">
-                      <p className="text-xs font-medium text-muted-foreground mb-3">Uploaded Files</p>
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between p-2 rounded bg-white/5 border border-white/10">
-                          <div className="flex items-center gap-2">
-                            <FileText className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm text-white">capstone.pdf</span>
-                          </div>
-                          {submission.file_url && (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="ghost"
-                              asChild
-                              className="text-xs h-6"
-                            >
-                              <a href={submission.file_url} download>
-                                <Download className="w-3 h-3" />
-                              </a>
-                            </Button>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-
-              {/* Right Panel - OCR Content */}
-              <div className="lg:col-span-2">
-                <Card className="bg-card/50 backdrop-blur border-white/10">
-                  <CardHeader>
-                    <CardTitle className="text-white flex items-center gap-2">
-                      <FileText className="w-5 h-5" />
-                      OCR Extracted Content
+                    <CardTitle className="text-orange-400 flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5" />
+                      Quality Flags
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <Tabs defaultValue="preview" className="w-full">
-                      <TabsList className="grid w-full grid-cols-3 bg-white/5">
-                        <TabsTrigger value="preview">Preview</TabsTrigger>
-                        <TabsTrigger value="fulltext">Full Text</TabsTrigger>
-                        <TabsTrigger value="quality">Quality Flags</TabsTrigger>
-                      </TabsList>
-
-                      {/* Preview Tab */}
-                      <TabsContent value="preview" className="mt-4">
-                        <div className="p-4 rounded-lg bg-white/5 border border-white/10 text-white/80 text-sm leading-relaxed">
-                          {submission.preview_text}
-                        </div>
-                      </TabsContent>
-
-                      {/* Full Text Tab with Search */}
-                      <TabsContent value="fulltext" className="mt-4 space-y-3">
-                        <div className="relative">
-                          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            placeholder="Search within OCR text..."
-                            value={searchText}
-                            onChange={(e) => setSearchText(e.target.value)}
-                            className="pl-10 bg-white/5 border-white/10"
-                          />
-                        </div>
-                        <div className="p-4 rounded-lg bg-white/5 border border-white/10 text-white/80 text-sm leading-relaxed max-h-[400px] overflow-y-auto">
-                          {highlightSearchResults(submission.full_ocr_text)}
-                        </div>
-                      </TabsContent>
-
-                      {/* Quality Flags Tab */}
-                      <TabsContent value="quality" className="mt-4">
-                        {submission.quality_flags && submission.quality_flags.length > 0 ? (
-                          <div className="space-y-2">
-                            {submission.quality_flags.map((flag, index) => (
-                              <Badge
-                                key={index}
-                                variant="outline"
-                                className="bg-yellow-500/20 text-yellow-300 border-yellow-500/30"
-                              >
-                                <AlertCircle className="w-3 h-3 mr-1" />
-                                {flag}
-                              </Badge>
-                            ))}
-                          </div>
-                        ) : (
-                          <div className="text-center py-6 text-muted-foreground">
-                            <Check className="w-8 h-8 text-green-400 mx-auto mb-2" />
-                            <p>No quality issues detected</p>
-                          </div>
-                        )}
-                      </TabsContent>
-                    </Tabs>
+                    <div className="space-y-2">
+                      {submission.quality_flags.map((flag) => (
+                        <Badge key={flag} variant="outline" className="bg-orange-500/20 text-orange-300 border-orange-500/30">
+                          {flag}
+                        </Badge>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
+              )}
+            </div>
+
+            {/* Right Column: OCR Content & Actions */}
+            <div className="lg:col-span-2 space-y-6">
+              {/* OCR Content Tabs */}
+              <Card className="bg-white/5 backdrop-blur border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white">OCR Content</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Tabs defaultValue="preview" className="w-full">
+                    <TabsList className="bg-white/10 border-white/10">
+                      <TabsTrigger value="preview">Preview</TabsTrigger>
+                      <TabsTrigger value="full-text">Full Text</TabsTrigger>
+                    </TabsList>
+
+                    <TabsContent value="preview" className="mt-4">
+                      <div className="bg-white/5 rounded-lg p-4 text-gray-300 text-sm max-h-96 overflow-y-auto whitespace-pre-wrap">
+                        {submission.preview_text || 'No preview available'}
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="full-text" className="mt-4 space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
+                        <Input
+                          placeholder="Search in text..."
+                          value={searchText}
+                          onChange={(e) => setSearchText(e.target.value)}
+                          className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-500"
+                        />
+                      </div>
+                      <div className="bg-white/5 rounded-lg p-4 text-gray-300 text-sm max-h-96 overflow-y-auto whitespace-pre-wrap">
+                        <div
+                          dangerouslySetInnerHTML={{
+                            __html: highlightText(submission.full_ocr_text),
+                          }}
+                        />
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                </CardContent>
+              </Card>
+
+              {/* Remarks Input */}
+              <Card className="bg-white/5 backdrop-blur border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white">Admin Remarks</CardTitle>
+                  <p className="text-sm text-gray-400">Required for Return or Reject actions</p>
+                </CardHeader>
+                <CardContent>
+                  <Textarea
+                    placeholder="Add remarks for the student..."
+                    value={remarks}
+                    onChange={(e) => setRemarks(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-500 resize-none min-h-24"
+                  />
+                </CardContent>
+              </Card>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 bg-transparent"
+                  onClick={() => {
+                    setAction('return')
+                    setDialogOpen(true)
+                  }}
+                  disabled={isLoading}
+                >
+                  <RotateCcw className="w-4 h-4 mr-2" />
+                  Return for Revision
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  className="flex-1"
+                  onClick={() => {
+                    setAction('reject')
+                    setDialogOpen(true)
+                  }}
+                  disabled={isLoading}
+                >
+                  <X className="w-4 h-4 mr-2" />
+                  Reject
+                </Button>
+
+                <Button
+                  className="flex-1 bg-green-600 hover:bg-green-500 text-white"
+                  onClick={handleApprove}
+                  disabled={isLoading}
+                >
+                  {isLoading && action === null ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                  Approve
+                </Button>
               </div>
             </div>
-
-            {/* Action Buttons at Bottom */}
-            <div className="flex flex-col sm:flex-row gap-3 mt-8 justify-end">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setReturnModalOpen(true)}
-                className="border-orange-500/30 text-orange-400 hover:bg-orange-500/10"
-                disabled={isLoading}
-              >
-                <RotateCcw className="w-4 h-4 mr-2" />
-                Return with Remarks
-              </Button>
-
-              <Button
-                type="button"
-                variant="destructive"
-                onClick={() => setRejectModalOpen(true)}
-                disabled={isLoading}
-              >
-                <X className="w-4 h-4 mr-2" />
-                Reject
-              </Button>
-
-              <Button
-                type="button"
-                className="bg-green-600 hover:bg-green-500"
-                onClick={() => setApproveDialogOpen(true)}
-                disabled={isLoading}
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                Approve
-              </Button>
-            </div>
           </div>
-        </main>
+        </div>
+      </main>
 
-        <Footer />
-
-        {/* Modals and Dialogs */}
-        <RemarksModal
-          open={returnModalOpen}
-          onOpenChange={setReturnModalOpen}
-          title="Return for Revision"
-          description="Provide remarks about what needs to be revised:"
-          placeholder="Describe the requested changes..."
-          isLoading={isLoading}
-          onConfirm={handleReturn}
-        />
-
-        <RemarksModal
-          open={rejectModalOpen}
-          onOpenChange={setRejectModalOpen}
-          title="Reject Submission"
-          description="Provide the reason for rejection:"
-          placeholder="Explain why this submission is being rejected..."
-          isLoading={isLoading}
-          onConfirm={handleReject}
-        />
-
-        <AlertDialog open={approveDialogOpen} onOpenChange={setApproveDialogOpen}>
-          <AlertDialogContent className="bg-card border-white/10">
-            <AlertDialogHeader>
-              <AlertDialogTitle className="text-white">Approve Submission</AlertDialogTitle>
-              <AlertDialogDescription>
-                Are you sure you want to approve this submission? This action cannot be undone.
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel className="border-white/20">Cancel</AlertDialogCancel>
-              <AlertDialogAction
-                className="bg-green-600 hover:bg-green-500"
-                onClick={handleApprove}
-                disabled={isLoading}
-              >
-                {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-                Approve
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      </div>
-    </RoleGuard>
+      {/* Confirmation Dialog */}
+      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <AlertDialogContent className="bg-[#1a1425] border-white/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">
+              {action === 'return' ? 'Return for Revision?' : 'Reject Submission?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {action === 'return'
+                ? 'The student will be able to revise and resubmit their work.'
+                : 'This action cannot be undone. The submission will be marked as rejected.'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-white/20 text-white hover:bg-white/10">
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              className={action === 'reject' ? 'bg-red-600 hover:bg-red-500' : 'bg-orange-600 hover:bg-orange-500'}
+              onClick={() => {
+                if (action === 'return') {
+                  handleReturn()
+                } else if (action === 'reject') {
+                  handleReject()
+                }
+              }}
+              disabled={isLoading}
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {action === 'return' ? 'Return' : 'Reject'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   )
 }
