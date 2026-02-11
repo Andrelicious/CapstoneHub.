@@ -43,7 +43,7 @@ export default function HeroSection() {
     }
   }
 
-  const showUploadButton = userRole !== "admin" && userRole !== "faculty"
+  const showUploadButton = userRole !== "admin" && userRole !== "adviser"
 
   return (
     <section id="home" className="relative min-h-screen flex items-center pt-20">

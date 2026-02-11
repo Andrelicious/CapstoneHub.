@@ -4,25 +4,32 @@ import type React from "react"
 
 import { useState, useRef } from "react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Eye, EyeOff, Mail, Lock, User, GraduationCap, ArrowRight, Users, Loader2 } from "lucide-react"
+import { Eye, EyeOff, Mail, Lock, User, GraduationCap, ArrowRight, Users, Shield, Loader2 } from "lucide-react"
 import AuthLayout from "@/components/auth-layout"
 import type { UserRole } from "@/types"
 import { createClient } from "@/lib/supabase/client"
 
-const roleOptions: { value: UserRole; label: string; description: string }[] = [
+const roleOptions: { value: UserRole; label: string; description: string; icon: React.ElementType }[] = [
   {
     value: "student",
     label: "Student",
-    description: "Upload and manage your capstone projects",
+    description: "Upload and manage your capstone or thesis submissions",
+    icon: GraduationCap,
   },
   {
-    value: "faculty",
-    label: "Faculty",
-    description: "Browse and advise student research",
+    value: "adviser",
+    label: "Adviser",
+    description: "Review submissions, provide feedback, and recommend approval",
+    icon: Users,
+  },
+  {
+    value: "admin",
+    label: "Admin",
+    description: "Manage users, repository records, approvals, and reports",
+    icon: Shield,
   },
 ]
 
@@ -31,7 +38,6 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const router = useRouter()
   const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
 
   const getSupabase = () => {
@@ -86,7 +92,6 @@ export default function RegisterPage() {
           data: {
             display_name: formData.fullName,
             role: formData.role,
-            student_id: formData.studentId || null,
           },
         },
       })
@@ -104,7 +109,6 @@ export default function RegisterPage() {
           email: formData.email,
           display_name: formData.fullName,
           role: formData.role,
-          student_id: formData.studentId || null,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         })
@@ -113,9 +117,10 @@ export default function RegisterPage() {
           console.error("Profile creation error:", profileError)
         }
 
-        // Redirect based on role
-        if (formData.role === "faculty") {
-          window.location.href = "/faculty/dashboard"
+        if (formData.role === "adviser") {
+          window.location.href = "/adviser/dashboard"
+        } else if (formData.role === "admin") {
+          window.location.href = "/admin/dashboard"
         } else {
           window.location.href = "/student/dashboard"
         }
@@ -141,38 +146,36 @@ export default function RegisterPage() {
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
           )}
 
-          {/* Role Selection */}
           <div className="space-y-3">
             <Label className="text-gray-300">I am a</Label>
-            <div className="grid grid-cols-2 gap-3">
-              {roleOptions.map((option) => (
-                <button
-                  key={option.value}
-                  type="button"
-                  onClick={() => setFormData((prev) => ({ ...prev, role: option.value }))}
-                  className={`p-4 rounded-xl border text-left transition-all duration-200 ${
-                    formData.role === option.value
-                      ? "border-purple-500 bg-purple-500/10"
-                      : "border-white/10 hover:border-white/20 bg-[#0a0612]"
-                  }`}
-                >
-                  <div className="flex items-center gap-3 mb-2">
-                    {option.value === "student" ? (
-                      <GraduationCap
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {roleOptions.map((option) => {
+                const IconComponent = option.icon
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setFormData((prev) => ({ ...prev, role: option.value }))}
+                    className={`p-4 rounded-xl border text-left transition-all duration-200 ${
+                      formData.role === option.value
+                        ? "border-purple-500 bg-purple-500/10"
+                        : "border-white/10 hover:border-white/20 bg-[#0a0612]"
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 mb-2">
+                      <IconComponent
                         className={`w-5 h-5 ${formData.role === option.value ? "text-purple-400" : "text-gray-500"}`}
                       />
-                    ) : (
-                      <Users
-                        className={`w-5 h-5 ${formData.role === option.value ? "text-purple-400" : "text-gray-500"}`}
-                      />
-                    )}
-                    <span className={`font-medium ${formData.role === option.value ? "text-white" : "text-gray-400"}`}>
-                      {option.label}
-                    </span>
-                  </div>
-                  <p className="text-xs text-gray-500">{option.description}</p>
-                </button>
-              ))}
+                      <span
+                        className={`font-medium ${formData.role === option.value ? "text-white" : "text-gray-400"}`}
+                      >
+                        {option.label}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-500 line-clamp-2">{option.description}</p>
+                  </button>
+                )
+              })}
             </div>
           </div>
 

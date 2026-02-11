@@ -61,11 +61,10 @@ export default function LoginPage() {
 
       const role = profile?.role || "student"
 
-      // Redirect based on role
       if (role === "admin") {
         window.location.href = "/admin/dashboard"
-      } else if (role === "faculty") {
-        window.location.href = "/faculty/dashboard"
+      } else if (role === "adviser") {
+        window.location.href = "/adviser/dashboard"
       } else {
         window.location.href = "/student/dashboard"
       }

@@ -91,7 +91,7 @@ export default async function BrowsePage() {
 
   const getBackLink = () => {
     if (userRole === "admin") return "/admin/dashboard"
-    if (userRole === "faculty") return "/faculty/dashboard"
+    if (userRole === "adviser") return "/adviser/dashboard"
     if (userRole === "student") return "/student/dashboard"
     return "/"
   }
@@ -128,7 +128,7 @@ export default async function BrowsePage() {
               </span>
             </h1>
             <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Explore approved research projects from CCS students and faculty
+              Explore approved research projects from CCS students and advisers
             </p>
           </div>
 

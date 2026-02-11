@@ -56,7 +56,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
         setLoadingPending(false)
         setPendingItems([])
       }
-    }, 3000) // 3 second timeout
+    }, 3000)
 
     const fetchPendingItems = async () => {
       setLoadingPending(true)
@@ -71,7 +71,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
         if (!cancelled) {
           clearTimeout(timeoutId)
           if (!error && data) {
-            if (profile?.role === "admin" || profile?.role === "faculty") {
+            if (profile?.role === "admin" || profile?.role === "adviser") {
               setPendingItems(data.filter((c) => c.status === "pending").slice(0, 5))
             } else {
               setPendingItems(data.filter((c) => c.uploader_id === user.id).slice(0, 5))
@@ -137,7 +137,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
   }
 
   const getDashboardUrl = () => {
-    if (profile?.role === "faculty") return "/faculty/dashboard"
+    if (profile?.role === "adviser") return "/adviser/dashboard"
     if (profile?.role === "admin") return "/admin/dashboard"
     return "/student/dashboard"
   }
@@ -298,7 +298,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
               <div className="flex items-center gap-2 text-gray-400">
                 <Bell className="w-4 h-4" />
                 <span className="text-sm font-medium">
-                  {profile?.role === "admin" || profile?.role === "faculty" ? "Pending Reviews" : "Your Submissions"}
+                  {profile?.role === "admin" || profile?.role === "adviser" ? "Pending Reviews" : "Your Submissions"}
                 </span>
               </div>
               <button
@@ -316,7 +316,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
                 </div>
               ) : pendingItems.length === 0 ? (
                 <div className="text-center py-4 text-gray-500 text-sm">
-                  {profile?.role === "admin" || profile?.role === "faculty"
+                  {profile?.role === "admin" || profile?.role === "adviser"
                     ? "No pending submissions"
                     : "No submissions yet"}
                 </div>

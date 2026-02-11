@@ -43,7 +43,7 @@ export default function Footer() {
 
   const getDashboardPath = () => {
     if (role === "admin") return "/admin/dashboard"
-    if (role === "faculty") return "/faculty/dashboard"
+    if (role === "adviser") return "/adviser/dashboard"
     return "/student/dashboard"
   }
 

@@ -64,7 +64,7 @@ export async function requireRole(allowedRoles: string[]): Promise<UserWithProfi
 }
 
 export function getDashboardUrl(role: string | null | undefined): string {
-  if (role === "faculty") return "/faculty/dashboard"
+  if (role === "adviser") return "/adviser/dashboard"
   if (role === "admin") return "/admin/dashboard"
   return "/student/dashboard"
 }

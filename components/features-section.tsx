@@ -1,31 +1,34 @@
 "use client"
 
-import { Upload, Search, Cloud, Shield } from "lucide-react"
+import { Upload, Search, Users, Shield } from "lucide-react"
 
 const features = [
   {
     icon: Upload,
-    title: "Upload & Store Capstones",
+    title: "Upload & Submit",
     description:
-      "Easily upload your capstone projects with all related documents, datasets, and source code in a secure repository.",
+      "Students upload capstone or thesis documents, review submission details, and submit their work for adviser review and administrative approval.",
     gradient: "from-purple-500 to-purple-700",
   },
   {
     icon: Search,
     title: "Search & Browse Research",
-    description: "Powerful search functionality to discover projects by title, author, technology stack, or keywords.",
+    description:
+      "Students, advisers, and administrators browse approved research projects using title, program, year, and advanced search tools.",
     gradient: "from-blue-500 to-blue-700",
   },
   {
-    icon: Cloud,
-    title: "Secure Cloud Storage",
-    description: "All projects are securely stored using Supabase with enterprise-grade encryption and backup systems.",
+    icon: Users,
+    title: "Adviser Review & Recommendations",
+    description:
+      "Advisers review student submissions, provide remarks, request revisions, and recommend works for final approval.",
     gradient: "from-cyan-500 to-cyan-700",
   },
   {
     icon: Shield,
-    title: "Faculty Admin & Review",
-    description: "Dedicated admin panel for faculty members to review, approve, and manage student submissions.",
+    title: "Admin Approval & Governance",
+    description:
+      "Administrators perform final approval, publish documents to the repository, manage users and roles, and generate academic reports.",
     gradient: "from-pink-500 to-purple-600",
   },
 ]
