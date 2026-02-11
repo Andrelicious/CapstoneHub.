@@ -102,19 +102,19 @@ export default function Navbar() {
   }
 
   const getDashboardUrl = () => {
-    if (profile?.role === "faculty") return "/faculty/dashboard"
+    if (profile?.role === "adviser") return "/adviser/dashboard"
     if (profile?.role === "admin") return "/admin/dashboard"
     return "/student/dashboard"
   }
 
-  const isAdminOrFaculty = profile?.role === "admin" || profile?.role === "faculty"
+  const isAdminOrAdviser = profile?.role === "admin" || profile?.role === "adviser"
 
   const navItems = [
     { name: "Home", href: "/" },
     { name: "Browse", href: "/browse" },
     { name: "Features", href: "/#features" },
     // Only show About for non-authenticated users or students
-    ...(!isAuthenticated || !isAdminOrFaculty ? [{ name: "About", href: "/#about" }] : []),
+    ...(!isAuthenticated || !isAdminOrAdviser ? [{ name: "About", href: "/#about" }] : []),
   ]
 
   return (
@@ -164,7 +164,7 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-3">
               {isAuthenticated ? (
                 <>
-                  {!isAdminOrFaculty && (
+                  {!isAdminOrAdviser && (
                     <a href="/upload">
                       <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10 gap-2">
                         <Upload className="w-4 h-4" />
@@ -251,7 +251,7 @@ export default function Navbar() {
                       </button>
                     </div>
 
-                    {!isAdminOrFaculty && (
+                    {!isAdminOrAdviser && (
                       <a
                         href="/upload"
                         className="text-gray-300 hover:text-white transition-colors px-4 py-2 flex items-center gap-2"

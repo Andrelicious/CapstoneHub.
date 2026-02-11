@@ -4,9 +4,9 @@ import { createServerClient } from "@supabase/ssr"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 import { BookOpen, Clock, CheckCircle2, XCircle, FileText, Users, TrendingUp, ArrowRight, Shield } from "lucide-react"
-import { FacultyPendingActions } from "@/components/faculty-pending-actions"
+import { AdviserPendingActions } from "@/components/adviser-pending-actions"
 
-export default async function FacultyDashboardPage() {
+export default async function AdviserDashboardPage() {
   const cookieStore = await cookies()
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -37,17 +37,17 @@ export default async function FacultyDashboardPage() {
   // Get user profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  // Check if user is faculty or admin
+  // Check if user is adviser or admin
   const userRole = profile?.role || user.user_metadata?.role || "student"
-  if (userRole !== "faculty" && userRole !== "admin") {
+  if (userRole !== "adviser" && userRole !== "admin") {
     redirect("/student/dashboard")
   }
 
   const isAdmin = userRole === "admin"
-  const dashboardTitle = isAdmin ? "Admin Dashboard" : "Faculty Dashboard"
+  const dashboardTitle = isAdmin ? "Admin Dashboard" : "Adviser Dashboard"
 
   const displayName =
-    profile?.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "Faculty"
+    profile?.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "Adviser"
 
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   const dataSupabase = serviceRoleKey
@@ -84,19 +84,6 @@ export default async function FacultyDashboardPage() {
     totalStudents: studentProfiles.length,
   }
 
-  let notificationCount = 0
-  try {
-    const { count } = await dataSupabase
-      .from("notifications")
-      .select("*", { count: "exact", head: true })
-      .or(`target_role.eq.faculty,target_role.eq.admin`)
-      .eq("is_read", false)
-    notificationCount = count || 0
-  } catch (e) {
-    // Notifications table might not exist yet
-    notificationCount = pendingCapstones.length
-  }
-
   return (
     <div className="min-h-screen bg-[#0a0612]">
       <Navbar />
@@ -117,7 +104,7 @@ export default async function FacultyDashboardPage() {
               </div>
               <div>
                 <p className="text-sm text-purple-400">{dashboardTitle}</p>
-                <p className="text-xs text-gray-500">Review & Management</p>
+                <p className="text-xs text-gray-500">Review & Recommendations</p>
               </div>
             </div>
             <h1 className="text-2xl md:text-3xl lg:text-4xl font-bold text-white mb-2">
@@ -126,9 +113,7 @@ export default async function FacultyDashboardPage() {
                 {displayName}
               </span>
             </h1>
-            <p className="text-gray-400 text-base md:text-lg">
-              Review student submissions and manage the capstone repository
-            </p>
+            <p className="text-gray-400 text-base md:text-lg">Review student submissions and provide recommendations</p>
           </div>
 
           {/* Stats Cards */}
@@ -246,7 +231,7 @@ export default async function FacultyDashboardPage() {
                 <p className="text-gray-400 text-sm md:text-base">No pending submissions to review</p>
               </div>
             ) : (
-              <FacultyPendingActions capstones={pendingCapstones} />
+              <AdviserPendingActions capstones={pendingCapstones} />
             )}
           </div>
         </div>

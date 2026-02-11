@@ -180,7 +180,7 @@ export default function NotificationsPage() {
 
   const getDashboardUrl = () => {
     if (userRole === "admin") return "/admin/dashboard"
-    if (userRole === "faculty") return "/faculty/dashboard"
+    if (userRole === "adviser") return "/adviser/dashboard"
     return "/student/dashboard"
   }
 

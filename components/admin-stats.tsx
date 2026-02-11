@@ -8,7 +8,7 @@ interface AdminStatsProps {
     rejected: number
     total_users: number
     total_students: number
-    total_faculty: number
+    total_advisers: number
   }
 }
 
@@ -66,9 +66,9 @@ export default function AdminStats({ stats }: AdminStatsProps) {
       <div className="glass rounded-xl border border-white/10 p-4">
         <div className="flex items-center gap-2 mb-2">
           <BookOpen className="w-4 h-4 text-purple-400" />
-          <span className="text-xs text-muted-foreground">Faculty</span>
+          <span className="text-xs text-muted-foreground">Advisers</span>
         </div>
-        <p className="text-2xl font-bold text-white">{stats.total_faculty}</p>
+        <p className="text-2xl font-bold text-white">{stats.total_advisers}</p>
       </div>
     </div>
   )

@@ -23,7 +23,6 @@ async function getAdminData() {
     },
   )
 
-  // Get authenticated user
   const {
     data: { user },
     error: authError,
@@ -33,10 +32,9 @@ async function getAdminData() {
     return { redirect: "/login" }
   }
 
-  // Check if user is admin
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  if (profile?.role !== "admin" && profile?.role !== "faculty") {
+  if (profile?.role !== "admin" && profile?.role !== "adviser") {
     return { redirect: "/student/dashboard" }
   }
 
@@ -52,13 +50,11 @@ async function getAdminData() {
       })
     : supabase
 
-  // Fetch all capstones
   const { data: allCapstones } = await dataSupabase
     .from("capstones")
     .select("*")
     .order("created_at", { ascending: false })
 
-  // Fetch all profiles
   const { data: allProfiles } = await dataSupabase.from("profiles").select("*")
 
   const capstones = allCapstones || []
@@ -71,7 +67,7 @@ async function getAdminData() {
     rejected: capstones.filter((c) => c.status === "rejected").length,
     total_users: profiles.length,
     total_students: profiles.filter((p) => p.role === "student").length,
-    total_faculty: profiles.filter((p) => p.role === "faculty").length,
+    total_advisers: profiles.filter((p) => p.role === "adviser").length,
   }
 
   const pendingCapstones = capstones.filter((c) => c.status === "pending")
