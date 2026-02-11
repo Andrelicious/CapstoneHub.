@@ -16,17 +16,14 @@ const roleOptions: { value: UserRole; label: string; description: string; icon: 
   {
     value: "student",
     label: "Student",
-    icon: GraduationCap,
   },
   {
     value: "adviser",
     label: "Adviser",
-    icon: Users,
   },
   {
     value: "admin",
     label: "Admin",
-    icon: Shield,
   },
 ]
 
