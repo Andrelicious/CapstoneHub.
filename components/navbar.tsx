@@ -124,7 +124,7 @@ export default function Navbar() {
     if (profile?.role === "student") {
       return [
         { name: "Browse", href: "/browse" },
-        { name: "Submit", href: "/upload" },
+        { name: "Submit", href: "/submit" },
       ]
     }
 
@@ -195,7 +195,7 @@ export default function Navbar() {
               {isAuthenticated ? (
                 <>
                   {profile?.role === "student" && (
-                    <a href="/upload">
+                    <a href="/submit">
                       <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10 gap-2">
                         <Upload className="w-4 h-4" />
                         Submit
@@ -283,7 +283,7 @@ export default function Navbar() {
 
                     {profile?.role === "student" && (
                       <a
-                        href="/upload"
+                        href="/submit"
                         className="text-gray-300 hover:text-white transition-colors px-4 py-2 flex items-center gap-2"
                         onClick={() => setMobileOpen(false)}
                       >

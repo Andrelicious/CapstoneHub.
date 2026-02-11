@@ -24,6 +24,8 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { SubmissionStatusBadge } from "./submission-status-badge"
+import { AdminQueueTable } from "./admin-queue-table"
 import { useRouter } from "next/navigation"
 import {
   Dialog,
@@ -239,7 +241,7 @@ export default function AdminDashboardContent({
             </a>
           </div>
 
-          {/* Pending Review Section */}
+          {/* Submissions Pending Review Section */}
           <Card className="bg-card/50 backdrop-blur border-white/10">
             <CardHeader>
               <div className="flex items-center gap-3">
@@ -247,91 +249,23 @@ export default function AdminDashboardContent({
                   <Clock className="w-5 h-5 text-yellow-400" />
                 </div>
                 <div>
-                  <CardTitle className="text-white">Pending Review</CardTitle>
-                  <p className="text-sm text-muted-foreground">{pendingCapstones.length} submissions awaiting review</p>
+                  <CardTitle className="text-white">Submissions Pending Review</CardTitle>
+                  <p className="text-sm text-muted-foreground">{pendingCapstones.length} submissions awaiting admin review</p>
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              {pendingCapstones.length === 0 ? (
-                <div className="text-center py-10">
-                  <CheckCircle className="w-12 h-12 text-green-400 mx-auto mb-4" />
-                  <p className="text-muted-foreground">All submissions have been reviewed!</p>
-                </div>
-              ) : (
-                pendingCapstones.map((capstone) => {
-                  const isLoading = actionLoading === capstone.id
-                  return (
-                    <div
-                      key={capstone.id}
-                      className="p-4 rounded-lg bg-white/5 border border-white/10 hover:border-white/20 transition-colors"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <Badge variant="outline" className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30">
-                              <Clock className="w-3 h-3 mr-1" />
-                              Pending
-                            </Badge>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(capstone.created_at).toLocaleDateString()}
-                            </span>
-                          </div>
-                          <h4 className="font-semibold text-white truncate">{capstone.title}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {capstone.authors?.join(", ")} | {capstone.category} | {capstone.year}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="outline"
-                            className="border-white/20 hover:bg-white/10 bg-transparent"
-                            onClick={(e) => {
-                              e.preventDefault()
-                              e.stopPropagation()
-                              setSelectedCapstone(capstone)
-                            }}
-                            disabled={isLoading}
-                          >
-                            <Eye className="w-4 h-4 mr-1" />
-                            Review
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            className="bg-green-600 hover:bg-green-500"
-                            onClick={(e) => handleApprove(e, capstone.id)}
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                            ) : (
-                              <Check className="w-4 h-4 mr-1" />
-                            )}
-                            Approve
-                          </Button>
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="destructive"
-                            onClick={(e) => handleReject(e, capstone.id)}
-                            disabled={isLoading}
-                          >
-                            {isLoading ? (
-                              <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                            ) : (
-                              <X className="w-4 h-4 mr-1" />
-                            )}
-                            Reject
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  )
-                })
-              )}
+            <CardContent>
+              {/* Transform capstones to submission format for table */}
+              <AdminQueueTable
+                submissions={pendingCapstones.map((cap) => ({
+                  id: cap.id,
+                  title: cap.title,
+                  program: cap.category || "General",
+                  student_name: cap.authors?.[0] || "Unknown",
+                  submitted_date: cap.created_at,
+                  status: "pending_admin_review" as const,
+                }))}
+              />
             </CardContent>
           </Card>
         </div>
