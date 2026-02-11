@@ -27,13 +27,29 @@ async function getApprovedDatasets() {
 
   const { data: datasets, error } = await supabase
     .from("datasets")
-    .select(`*, profiles(display_name, id)`)
+    .select("*")
     .eq("status", "approved")
     .order("approved_at", { ascending: false })
 
   if (error) {
     console.error("Error fetching datasets:", error)
     return []
+  }
+
+  // Fetch profiles separately and join manually
+  if (datasets && datasets.length > 0) {
+    const userIds = [...new Set(datasets.map((d) => d.user_id))]
+    const { data: profiles } = await supabase
+      .from("profiles")
+      .select("id, display_name")
+      .in("id", userIds)
+
+    const profileMap = new Map(profiles?.map((p) => [p.id, p]) || [])
+
+    return datasets.map((d) => ({
+      ...d,
+      profiles: profileMap.get(d.user_id),
+    }))
   }
 
   return datasets || []

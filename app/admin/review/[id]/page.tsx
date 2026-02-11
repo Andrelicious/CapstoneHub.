@@ -45,22 +45,27 @@ async function getSubmissionData(id: string) {
     return { redirect: '/login' }
   }
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+  const { data: adminProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
   // Only admins can access review pages
-  if (profile?.role !== 'admin') {
+  if (adminProfile?.role !== 'admin') {
     return { redirect: '/student/dashboard' }
   }
 
   const { data: dataset } = await supabase
     .from('datasets')
-    .select('*, profiles(display_name), ocr_results(*)')
+    .select('*')
     .eq('id', id)
     .single()
 
   if (!dataset) {
     return { redirect: '/admin/dashboard', notFound: true }
   }
+
+  // Fetch profile and OCR results separately
+  const { data: studentProfile } = await supabase.from('profiles').select('display_name').eq('id', dataset.user_id).single()
+
+  const { data: ocrResults } = await supabase.from('ocr_results').select('*').eq('dataset_id', id).single()
 
   // Transform dataset to submission format
   const transformedSubmission = {
@@ -69,12 +74,12 @@ async function getSubmissionData(id: string) {
     program: dataset.program || 'General',
     document_type: dataset.doc_type || 'Capstone Project',
     student_id: dataset.user_id || '',
-    student_name: dataset.profiles?.display_name || 'Unknown',
+    student_name: studentProfile?.display_name || 'Unknown',
     submitted_date: dataset.created_at,
     status: dataset.status as 'pending_admin_review',
-    preview_text: dataset.ocr_results?.preview_text || dataset.description || 'No OCR preview available',
-    full_ocr_text: dataset.ocr_results?.full_text || 'No OCR text extracted yet',
-    quality_flags: dataset.ocr_results?.quality_flags ? Object.keys(dataset.ocr_results.quality_flags) : [],
+    preview_text: ocrResults?.preview_text || dataset.description || 'No OCR preview available',
+    full_ocr_text: ocrResults?.full_text || 'No OCR text extracted yet',
+    quality_flags: ocrResults?.quality_flags ? Object.keys(ocrResults.quality_flags) : [],
     file_url: dataset.file_path ? `/storage/download/${dataset.file_path}` : undefined,
   }
 

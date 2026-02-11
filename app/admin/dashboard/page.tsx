@@ -52,7 +52,7 @@ async function getAdminData() {
 
   const { data: allDatasets } = await dataSupabase
     .from("datasets")
-    .select("*, profiles(display_name, id)")
+    .select("*")
     .order("created_at", { ascending: false })
 
   const { data: allProfiles } = await dataSupabase.from("profiles").select("*")
@@ -60,17 +60,24 @@ async function getAdminData() {
   const datasets = allDatasets || []
   const profiles = allProfiles || []
 
+  // Manually join profiles to datasets
+  const profileMap = new Map(profiles.map((p) => [p.id, p]))
+  const datasetsWithProfiles = datasets.map((d) => ({
+    ...d,
+    profiles: profileMap.get(d.user_id),
+  }))
+
   const stats = {
     total_datasets: datasets.length,
-    pending_review: datasets.filter((d) => d.status === "pending_admin_review").length,
-    approved: datasets.filter((d) => d.status === "approved").length,
-    rejected: datasets.filter((d) => d.status === "rejected").length,
+    pending_review: datasetsWithProfiles.filter((d) => d.status === "pending_admin_review").length,
+    approved: datasetsWithProfiles.filter((d) => d.status === "approved").length,
+    rejected: datasetsWithProfiles.filter((d) => d.status === "rejected").length,
     total_users: profiles.length,
     total_students: profiles.filter((p) => p.role === "student").length,
     total_advisers: profiles.filter((p) => p.role === "adviser").length,
   }
 
-  const pendingDatasets = datasets.filter((d) => d.status === "pending_admin_review")
+  const pendingDatasets = datasetsWithProfiles.filter((d) => d.status === "pending_admin_review")
   const displayName = profile?.display_name || user.email?.split("@")[0] || "Admin"
 
   return {

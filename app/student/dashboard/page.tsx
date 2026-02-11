@@ -25,10 +25,25 @@ import {
 } from "lucide-react"
 
 const statusConfig = {
-  pending: {
+  draft: {
+    icon: <Clock className="w-4 h-4" />,
+    color: "text-gray-400",
+    bgColor: "bg-gray-500/20 border-gray-500/30",
+  },
+  ocr_processing: {
     icon: <Clock className="w-4 h-4" />,
     color: "text-yellow-400",
     bgColor: "bg-yellow-500/20 border-yellow-500/30",
+  },
+  pending_admin_review: {
+    icon: <Clock className="w-4 h-4" />,
+    color: "text-blue-400",
+    bgColor: "bg-blue-500/20 border-blue-500/30",
+  },
+  returned: {
+    icon: <Clock className="w-4 h-4" />,
+    color: "text-orange-400",
+    bgColor: "bg-orange-500/20 border-orange-500/30",
   },
   approved: {
     icon: <CheckCircle2 className="w-4 h-4" />,
@@ -76,13 +91,13 @@ export default function StudentDashboardPage() {
 
       setProfile(profileData)
 
-      const { data: capstonesData } = await supabase
-        .from("capstones")
+      const { data: datasetsData } = await supabase
+        .from("datasets")
         .select("*")
-        .eq("uploader_id", authSession.user.id)
+        .eq("user_id", authSession.user.id)
         .order("created_at", { ascending: false })
 
-      setCapstones(capstonesData || [])
+      setCapstones(datasetsData || [])
       setLoading(false)
     }
     loadData()

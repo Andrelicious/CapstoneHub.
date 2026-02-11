@@ -62,27 +62,36 @@ export default async function AdviserDashboardPage() {
     : supabase
 
   // Fetch all data
-  const { data: allCapstones } = await dataSupabase
-    .from("capstones")
+  const { data: allDatasets } = await dataSupabase
+    .from("datasets")
     .select("*")
     .order("created_at", { ascending: false })
 
   const { data: allProfiles } = await dataSupabase.from("profiles").select("*")
 
   // Calculate stats from the data
-  const capstonesList = allCapstones || []
-  const pendingCapstones = capstonesList.filter((c) => c.status === "pending")
-  const approvedCapstones = capstonesList.filter((c) => c.status === "approved")
-  const rejectedCapstones = capstonesList.filter((c) => c.status === "rejected")
+  const datasetsList = allDatasets || []
+  const pendingDatasets = datasetsList.filter((d) => d.status === "pending_admin_review")
+  const approvedDatasets = datasetsList.filter((d) => d.status === "approved")
+  const rejectedDatasets = datasetsList.filter((d) => d.status === "rejected")
   const studentProfiles = (allProfiles || []).filter((p) => p.role === "student")
 
+  // Manually join profiles for display
+  const profileMap = new Map(allProfiles.map((p) => [p.id, p]))
+  const pendingDatasetsWithProfiles = pendingDatasets.map((d) => ({
+    ...d,
+    profiles: profileMap.get(d.user_id),
+  }))
+
   const stats = {
-    totalProjects: capstonesList.length,
-    pendingReview: pendingCapstones.length,
-    approved: approvedCapstones.length,
-    rejected: rejectedCapstones.length,
+    totalProjects: datasetsList.length,
+    pendingReview: pendingDatasets.length,
+    approved: approvedDatasets.length,
+    rejected: rejectedDatasets.length,
     totalStudents: studentProfiles.length,
   }
+
+  const pendingCapstones = pendingDatasetsWithProfiles // Declare the pendingCapstones variable
 
   return (
     <div className="min-h-screen bg-[#0a0612]">
@@ -224,14 +233,14 @@ export default async function AdviserDashboardPage() {
               </div>
             </div>
 
-            {pendingCapstones.length === 0 ? (
+            {pendingDatasets.length === 0 ? (
               <div className="text-center py-8 md:py-12">
                 <CheckCircle2 className="w-10 h-10 md:w-12 md:h-12 text-green-500 mx-auto mb-4" />
                 <h3 className="text-base md:text-lg font-medium text-white mb-2">All caught up!</h3>
                 <p className="text-gray-400 text-sm md:text-base">No pending submissions to review</p>
               </div>
             ) : (
-              <AdviserPendingActions capstones={pendingCapstones} />
+              <AdviserPendingActions capstones={pendingDatasetsWithProfiles} />
             )}
           </div>
         </div>
