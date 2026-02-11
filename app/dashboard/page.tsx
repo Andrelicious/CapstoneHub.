@@ -4,20 +4,16 @@ import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { Loader2 } from "lucide-react"
 
-// This page redirects to the appropriate dashboard based on role
-// For now with mock data, it redirects to student dashboard
 export default function DashboardRedirect() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    // Mock role check - in production this would check Supabase
-    // For demo purposes, redirect to student dashboard
-    const mockRole = "student" // Change to "faculty" to test faculty dashboard
+    const mockRole = "student"
 
     setTimeout(() => {
-      if (mockRole === "faculty" || mockRole === "admin") {
-        router.replace("/faculty/dashboard")
+      if (mockRole === "adviser" || mockRole === "admin") {
+        router.replace("/adviser/dashboard")
       } else {
         router.replace("/student/dashboard")
       }

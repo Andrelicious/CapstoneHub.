@@ -19,11 +19,11 @@ interface Capstone {
   uploader_id?: string
 }
 
-interface FacultyPendingActionsProps {
+interface AdviserPendingActionsProps {
   capstones: Capstone[]
 }
 
-export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPendingActionsProps) {
+export function AdviserPendingActions({ capstones: initialCapstones }: AdviserPendingActionsProps) {
   const [capstones, setCapstones] = useState(initialCapstones)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
@@ -36,7 +36,7 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
     return supabaseRef.current
   }
 
-  const handleUpdateStatus = async (e: React.MouseEvent, capstone: Capstone, newStatus: "approved" | "rejected") => {
+  const handleRecommend = async (e: React.MouseEvent, capstone: Capstone, recommendation: "approved" | "rejected") => {
     e.preventDefault()
     e.stopPropagation()
     if (processingId) return
@@ -48,22 +48,36 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
     setCapstones((prev) => prev.filter((c) => c.id !== capstone.id))
 
     const supabase = getSupabase()
+
+    // For advisers, we set status to "recommended" instead of direct approval
+    // Admin will do final approval
+    const newStatus = recommendation === "approved" ? "recommended" : "rejected"
+
     const { error } = await supabase.from("capstones").update({ status: newStatus }).eq("id", capstone.id)
 
     if (error) {
       setCapstones(prevCapstones)
-      setActionMessage({ type: "error", text: `Failed to ${newStatus}: ${error.message}` })
+      setActionMessage({ type: "error", text: `Failed to update: ${error.message}` })
     } else {
       // Create notification for the uploader
       if (capstone.uploader_id) {
+        const notificationType = recommendation === "approved" ? "capstone_recommended" : "capstone_rejected"
+        const notificationTitle = recommendation === "approved" ? "Capstone Recommended" : "Capstone Rejected"
+        const notificationDesc =
+          recommendation === "approved"
+            ? `Your capstone "${capstone.title}" has been recommended for approval by your adviser.`
+            : `Your capstone "${capstone.title}" has been rejected by your adviser.`
+
         await supabase.from("notifications").insert({
           user_id: capstone.uploader_id,
-          type: newStatus === "approved" ? "capstone_approved" : "capstone_rejected",
-          title: `Capstone ${newStatus}`,
-          description: `Your capstone "${capstone.title}" has been ${newStatus}.`,
+          type: notificationType,
+          title: notificationTitle,
+          description: notificationDesc,
         })
       }
-      setActionMessage({ type: "success", text: `Capstone ${newStatus} successfully` })
+
+      const message = recommendation === "approved" ? "Capstone recommended for admin approval" : "Capstone rejected"
+      setActionMessage({ type: "success", text: message })
     }
 
     setProcessingId(null)
@@ -121,7 +135,7 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
                 </span>
                 <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 whitespace-nowrap">
                   <Clock className="w-3 h-3 mr-1" />
-                  Pending
+                  Pending Review
                 </Badge>
               </div>
 
@@ -148,7 +162,7 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={(e) => handleUpdateStatus(e, capstone, "approved")}
+                onClick={(e) => handleRecommend(e, capstone, "approved")}
                 disabled={processingId === capstone.id}
                 className="text-green-400 hover:text-green-300 hover:bg-green-500/10 flex-1 md:flex-none"
               >
@@ -157,7 +171,7 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
                 ) : (
                   <>
                     <Check className="w-4 h-4 mr-1" />
-                    Approve
+                    Recommend
                   </>
                 )}
               </Button>
@@ -165,7 +179,7 @@ export function FacultyPendingActions({ capstones: initialCapstones }: FacultyPe
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={(e) => handleUpdateStatus(e, capstone, "rejected")}
+                onClick={(e) => handleRecommend(e, capstone, "rejected")}
                 disabled={processingId === capstone.id}
                 className="text-red-400 hover:text-red-300 hover:bg-red-500/10 flex-1 md:flex-none"
               >

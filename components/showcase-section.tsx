@@ -119,7 +119,7 @@ export default function ShowcaseSection() {
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
             Built for{" "}
             <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
-              CCS Students & Faculty
+              CCS Students & Advisers
             </span>
           </h2>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">

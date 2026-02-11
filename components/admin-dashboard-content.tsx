@@ -42,7 +42,7 @@ interface Stats {
   rejected: number
   total_users: number
   total_students: number
-  total_faculty: number
+  total_advisers: number
 }
 
 interface Capstone {
@@ -146,7 +146,7 @@ export default function AdminDashboardContent({
     { label: "Rejected", value: stats.rejected, icon: XCircle, color: "from-red-500 to-rose-500" },
     { label: "Total Users", value: stats.total_users, icon: Users, color: "from-blue-500 to-blue-600" },
     { label: "Students", value: stats.total_students, icon: GraduationCap, color: "from-cyan-500 to-cyan-600" },
-    { label: "Faculty", value: stats.total_faculty, icon: Briefcase, color: "from-indigo-500 to-indigo-600" },
+    { label: "Advisers", value: stats.total_advisers, icon: Briefcase, color: "from-indigo-500 to-indigo-600" },
   ]
 
   return (
