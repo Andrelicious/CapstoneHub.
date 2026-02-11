@@ -1,9 +1,9 @@
 // Capstone Hub TypeScript Types
 // These types mirror the Supabase database schema
 
-export type UserRole = "student" | "faculty" | "admin"
+export type UserRole = "student" | "adviser" | "admin"
 
-export type CapstoneStatus = "pending" | "approved" | "rejected"
+export type CapstoneStatus = "draft" | "pending" | "for_revision" | "recommended" | "approved" | "rejected" | "archived"
 
 export interface Profile {
   id: string
@@ -73,5 +73,5 @@ export interface DashboardStats {
 export interface AdminStats extends DashboardStats {
   total_users: number
   total_students: number
-  total_faculty: number
+  total_advisers: number
 }

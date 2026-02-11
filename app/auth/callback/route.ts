@@ -37,8 +37,8 @@ export async function GET(request: Request) {
       const role = profile.role || "student"
       if (role === "admin") {
         return NextResponse.redirect(`${origin}/admin/dashboard`)
-      } else if (role === "faculty") {
-        return NextResponse.redirect(`${origin}/faculty/dashboard`)
+      } else if (role === "adviser") {
+        return NextResponse.redirect(`${origin}/adviser/dashboard`)
       } else {
         return NextResponse.redirect(`${origin}/student/dashboard`)
       }

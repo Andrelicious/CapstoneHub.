@@ -69,8 +69,8 @@ export default function StudentDashboardPage() {
       if (role === "admin") {
         router.push("/admin/dashboard")
         return
-      } else if (role === "faculty") {
-        router.push("/faculty/dashboard")
+      } else if (role === "adviser") {
+        router.push("/adviser/dashboard")
         return
       }
 

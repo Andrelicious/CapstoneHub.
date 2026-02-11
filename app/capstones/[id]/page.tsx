@@ -40,8 +40,7 @@ async function getCapstone(id: string) {
   if (user) {
     const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
 
-    // If user is faculty or admin, use service role to bypass RLS
-    if (profile?.role === "faculty" || profile?.role === "admin") {
+    if (profile?.role === "adviser" || profile?.role === "admin") {
       const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
       if (serviceRoleKey) {
         dataSupabase = createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {

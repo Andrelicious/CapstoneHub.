@@ -102,20 +102,50 @@ export default function Navbar() {
   }
 
   const getDashboardUrl = () => {
-    if (profile?.role === "faculty") return "/faculty/dashboard"
+    if (profile?.role === "adviser") return "/adviser/dashboard"
     if (profile?.role === "admin") return "/admin/dashboard"
     return "/student/dashboard"
   }
 
-  const isAdminOrFaculty = profile?.role === "admin" || profile?.role === "faculty"
+  const isAdminOrAdviser = profile?.role === "admin" || profile?.role === "adviser"
 
-  const navItems = [
-    { name: "Home", href: "/" },
-    { name: "Browse", href: "/browse" },
-    { name: "Features", href: "/#features" },
-    // Only show About for non-authenticated users or students
-    ...(!isAuthenticated || !isAdminOrFaculty ? [{ name: "About", href: "/#about" }] : []),
-  ]
+  // Role-based navigation items
+  const getNavItems = () => {
+    if (!isAuthenticated) {
+      return [
+        { name: "Home", href: "/" },
+        { name: "Browse", href: "/browse" },
+        { name: "Features", href: "/#features" },
+        { name: "About", href: "/#about" },
+      ]
+    }
+
+    // Student navigation
+    if (profile?.role === "student") {
+      return [
+        { name: "Browse", href: "/browse" },
+        { name: "Submit", href: "/upload" },
+      ]
+    }
+
+    // Adviser navigation (view-only)
+    if (profile?.role === "adviser") {
+      return [
+        { name: "Browse", href: "/browse" },
+      ]
+    }
+
+    // Admin navigation
+    if (profile?.role === "admin") {
+      return [
+        { name: "Browse", href: "/browse" },
+      ]
+    }
+
+    return []
+  }
+
+  const navItems = getNavItems()
 
   return (
     <>
@@ -164,11 +194,11 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-3">
               {isAuthenticated ? (
                 <>
-                  {!isAdminOrFaculty && (
+                  {profile?.role === "student" && (
                     <a href="/upload">
                       <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10 gap-2">
                         <Upload className="w-4 h-4" />
-                        Upload
+                        Submit
                       </Button>
                     </a>
                   )}
@@ -251,14 +281,14 @@ export default function Navbar() {
                       </button>
                     </div>
 
-                    {!isAdminOrFaculty && (
+                    {profile?.role === "student" && (
                       <a
                         href="/upload"
                         className="text-gray-300 hover:text-white transition-colors px-4 py-2 flex items-center gap-2"
                         onClick={() => setMobileOpen(false)}
                       >
                         <Upload className="w-4 h-4" />
-                        Upload
+                        Submit
                       </a>
                     )}
                     <a
