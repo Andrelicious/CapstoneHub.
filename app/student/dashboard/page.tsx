@@ -40,7 +40,20 @@ export default async function StudentDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+  // Fetch profile using service role API to avoid RLS infinite recursion
+  let profile = null
+  try {
+    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
+      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
+    })
+    if (profileRes.ok) {
+      const { profile: p } = await profileRes.json()
+      profile = p
+    }
+  } catch (e) {
+    console.error('Failed to fetch profile:', e)
+  }
+
   const userRole = profile?.role || 'student'
 
   // RBAC: Only students can access this page

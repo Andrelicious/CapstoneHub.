@@ -45,7 +45,19 @@ async function getSubmissionData(id: string) {
     return { redirect: '/login' }
   }
 
-  const { data: adminProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
+  // Fetch admin profile using service role API to avoid RLS infinite recursion
+  let adminProfile = null
+  try {
+    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
+      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
+    })
+    if (profileRes.ok) {
+      const { profile: p } = await profileRes.json()
+      adminProfile = p
+    }
+  } catch (e) {
+    console.error('Failed to fetch profile:', e)
+  }
 
   // RBAC: Only admins can access review pages
   if (adminProfile?.role !== 'admin') {
@@ -63,10 +75,22 @@ async function getSubmissionData(id: string) {
     return { redirect: '/admin/dashboard', notFound: true }
   }
 
-  // Fetch profile and OCR results separately
-  const { data: studentProfile } = await supabase.from('profiles').select('display_name').eq('id', dataset.user_id).single()
+  // Fetch student profile and OCR results using service role to avoid RLS
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const dataSupabase = serviceRoleKey
+    ? createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
+        cookies: {
+          getAll() {
+            return cookieStore.getAll()
+          },
+          setAll() {},
+        },
+      })
+    : supabase
 
-  const { data: ocrResults } = await supabase.from('ocr_results').select('*').eq('dataset_id', id).single()
+  const { data: studentProfile } = await dataSupabase.from('profiles').select('display_name').eq('id', dataset.user_id).single()
+
+  const { data: ocrResults } = await dataSupabase.from('ocr_results').select('*').eq('dataset_id', id).single()
 
   // Transform dataset to submission format
   const transformedSubmission = {

@@ -34,8 +34,19 @@ export default async function AdviserDashboardPage() {
     redirect("/login")
   }
 
-  // Get user profile
-  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
+  // Get user profile using service role API to avoid RLS infinite recursion
+  let profile = null
+  try {
+    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
+      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
+    })
+    if (profileRes.ok) {
+      const { profile: p } = await profileRes.json()
+      profile = p
+    }
+  } catch (e) {
+    console.error('Failed to fetch profile:', e)
+  }
 
   // Check if user is adviser (NOT admin - admins go to /admin/dashboard)
   const userRole = profile?.role || user.user_metadata?.role || "student"
