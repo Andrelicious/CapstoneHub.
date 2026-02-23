@@ -171,27 +171,13 @@ export default async function StudentDashboardPage() {
 
           {/* My Submissions */}
           <div className="rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-white">My Submissions</h2>
-              <Link href="/submit">
-                <Button className="bg-gradient-to-r from-purple-600 to-cyan-500 text-white">
-                  <Upload className="w-4 h-4 mr-2" />
-                  Submit New
-                </Button>
-              </Link>
-            </div>
+            <h2 className="text-xl font-semibold text-white mb-6">My Submissions</h2>
 
             {datasetsList.length === 0 ? (
               <div className="text-center py-12">
                 <FileText className="w-12 h-12 text-gray-600 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-white mb-2">No submissions yet</h3>
-                <p className="text-gray-400 mb-4">Start by submitting your capstone through the wizard</p>
-                <Link href="/submit">
-                  <Button className="bg-gradient-to-r from-purple-600 to-cyan-500 text-white">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Submit Capstone
-                  </Button>
-                </Link>
+                <p className="text-gray-400">Use the "Submit New Capstone" card above to get started</p>
               </div>
             ) : (
               <div className="space-y-4">

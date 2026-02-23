@@ -30,23 +30,13 @@ export function StudentProfileMenu() {
         return
       }
 
-      const { data } = await supabase
-        .from("profiles")
-        .select("id, display_name, email, role")
-        .eq("id", user.id)
-        .single()
-
-      if (data) {
-        setProfile(data)
-      } else {
-        // Fallback to user metadata
-        setProfile({
-          id: user.id,
-          display_name: user.user_metadata?.display_name || user.email?.split("@")[0] || "User",
-          email: user.email || "",
-          role: user.user_metadata?.role || "student",
-        })
-      }
+      // Use user metadata to avoid RLS infinite recursion on profiles table
+      setProfile({
+        id: user.id,
+        display_name: user.user_metadata?.display_name || user.email?.split("@")[0] || "User",
+        email: user.email || "",
+        role: user.user_metadata?.role || "student",
+      })
       setLoading(false)
     }
     loadProfile()

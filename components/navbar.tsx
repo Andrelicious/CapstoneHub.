@@ -38,22 +38,13 @@ export default function Navbar() {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        // Set profile from user metadata immediately
+        // Set profile from user metadata (avoid RLS issues)
         setProfile({
           display_name: session.user.user_metadata?.display_name || session.user.email?.split("@")[0] || "User",
           email: session.user.email || null,
           role: session.user.user_metadata?.role || "student",
           avatar_url: session.user.user_metadata?.avatar_url || null,
         })
-        // Fetch full profile in background
-        supabase
-          .from("profiles")
-          .select("display_name, email, role, avatar_url")
-          .eq("id", session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setProfile(data)
-          })
       }
     })
 
@@ -63,21 +54,13 @@ export default function Navbar() {
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user)
+        // Use user metadata only (avoid RLS infinite recursion on profiles table)
         setProfile({
           display_name: session.user.user_metadata?.display_name || session.user.email?.split("@")[0] || "User",
           email: session.user.email || null,
           role: session.user.user_metadata?.role || "student",
           avatar_url: session.user.user_metadata?.avatar_url || null,
         })
-        // Fetch full profile
-        supabase
-          .from("profiles")
-          .select("display_name, email, role, avatar_url")
-          .eq("id", session.user.id)
-          .single()
-          .then(({ data }) => {
-            if (data) setProfile(data)
-          })
       } else {
         setUser(null)
         setProfile(null)
