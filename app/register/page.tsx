@@ -103,26 +103,44 @@ export default function RegisterPage() {
       }
 
       if (authData.user) {
-        // Create profile in profiles table
-        const { error: profileError } = await supabase.from("profiles").upsert({
-          id: authData.user.id,
-          email: formData.email,
-          display_name: formData.fullName,
-          role: formData.role,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        })
+        // Create profile in profiles table using service role to bypass RLS
+        try {
+          const response = await fetch("/api/create-profile", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              id: authData.user.id,
+              email: formData.email,
+              display_name: formData.fullName,
+              role: formData.role,
+            }),
+          })
 
-        if (profileError) {
-          console.error("Profile creation error:", profileError)
-        }
+          if (!response.ok) {
+            const error = await response.json()
+            console.error("Profile creation error:", error)
+          }
 
-        if (formData.role === "adviser") {
-          window.location.href = "/adviser/dashboard"
-        } else if (formData.role === "admin") {
-          window.location.href = "/admin/dashboard"
-        } else {
-          window.location.href = "/student/dashboard"
+          // Redirect after a brief delay to ensure profile is created
+          setTimeout(() => {
+            if (formData.role === "adviser") {
+              window.location.href = "/adviser/dashboard"
+            } else if (formData.role === "admin") {
+              window.location.href = "/admin/dashboard"
+            } else {
+              window.location.href = "/student/dashboard"
+            }
+          }, 500)
+        } catch (err) {
+          console.error("Profile creation error:", err)
+          // Still redirect even if profile creation fails
+          if (formData.role === "adviser") {
+            window.location.href = "/adviser/dashboard"
+          } else if (formData.role === "admin") {
+            window.location.href = "/admin/dashboard"
+          } else {
+            window.location.href = "/student/dashboard"
+          }
         }
       }
     } catch (err) {
