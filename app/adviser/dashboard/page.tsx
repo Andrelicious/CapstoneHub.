@@ -37,14 +37,16 @@ export default async function AdviserDashboardPage() {
   // Get user profile
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  // Check if user is adviser or admin
+  // Check if user is adviser (NOT admin - admins go to /admin/dashboard)
   const userRole = profile?.role || user.user_metadata?.role || "student"
-  if (userRole !== "adviser" && userRole !== "admin") {
+  if (userRole === "student") {
     redirect("/student/dashboard")
   }
+  if (userRole === "admin") {
+    redirect("/admin/dashboard")
+  }
 
-  const isAdmin = userRole === "admin"
-  const dashboardTitle = isAdmin ? "Admin Dashboard" : "Adviser Dashboard"
+  const dashboardTitle = "Adviser Dashboard"
 
   const displayName =
     profile?.display_name || user.user_metadata?.display_name || user.email?.split("@")[0] || "Adviser"
@@ -197,24 +199,7 @@ export default async function AdviserDashboardPage() {
               </div>
             </a>
 
-            {isAdmin && (
-              <a href="/admin/dashboard" className="block">
-                <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-4 md:p-6 hover:border-cyan-500/50 transition-all duration-300 cursor-pointer">
-                  <div className="flex items-center gap-3 md:gap-4">
-                    <div className="w-12 h-12 md:w-14 md:h-14 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center flex-shrink-0 group-hover:scale-110 transition-transform">
-                      <TrendingUp className="w-6 h-6 md:w-7 md:h-7 text-white" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <h3 className="text-lg md:text-xl font-semibold text-white group-hover:text-cyan-300 transition-colors">
-                        Admin Panel
-                      </h3>
-                      <p className="text-gray-400 text-sm md:text-base">Full management controls</p>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all flex-shrink-0" />
-                  </div>
-                </div>
-              </a>
-            )}
+
           </div>
 
           {/* Pending Submissions */}

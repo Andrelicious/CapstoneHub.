@@ -34,7 +34,8 @@ async function getAdminData() {
 
   const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).single()
 
-  if (profile?.role !== "admin" && profile?.role !== "adviser") {
+  if (profile?.role !== "admin") {
+    if (profile?.role === "adviser") return { redirect: "/adviser/dashboard" }
     return { redirect: "/student/dashboard" }
   }
 
@@ -67,9 +68,14 @@ async function getAdminData() {
     profiles: profileMap.get(d.user_id),
   }))
 
+  // Only show submissions pending admin review or still processing OCR
+  const submissionsForReview = datasetsWithProfiles.filter(
+    (d) => d.status === "pending_admin_review" || d.status === "ocr_processing"
+  )
+
   const stats = {
     total_datasets: datasets.length,
-    pending_review: datasetsWithProfiles.filter((d) => d.status === "pending_admin_review").length,
+    pending_review: submissionsForReview.length,
     approved: datasetsWithProfiles.filter((d) => d.status === "approved").length,
     rejected: datasetsWithProfiles.filter((d) => d.status === "rejected").length,
     total_users: profiles.length,
@@ -77,7 +83,7 @@ async function getAdminData() {
     total_advisers: profiles.filter((p) => p.role === "adviser").length,
   }
 
-  const pendingDatasets = datasetsWithProfiles.filter((d) => d.status === "pending_admin_review")
+  const pendingDatasets = submissionsForReview
   const displayName = profile?.display_name || user.email?.split("@")[0] || "Admin"
 
   return {

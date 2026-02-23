@@ -47,8 +47,9 @@ async function getSubmissionData(id: string) {
 
   const { data: adminProfile } = await supabase.from('profiles').select('*').eq('id', user.id).single()
 
-  // Only admins can access review pages
+  // RBAC: Only admins can access review pages
   if (adminProfile?.role !== 'admin') {
+    if (adminProfile?.role === 'adviser') return { redirect: '/adviser/dashboard' }
     return { redirect: '/student/dashboard' }
   }
 
