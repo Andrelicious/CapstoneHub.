@@ -85,46 +85,51 @@ export default function Navbar() {
   }
 
   const getDashboardUrl = () => {
-    if (profile?.role === "adviser") return "/adviser/dashboard"
-    if (profile?.role === "admin") return "/admin/dashboard"
-    return "/student/dashboard"
+    if (profile?.role === "adviser") return "/app/adviser/dashboard"
+    if (profile?.role === "admin") return "/app/admin/dashboard"
+    return "/app/student/dashboard"
   }
 
-  const isAdminOrAdviser = profile?.role === "admin" || profile?.role === "adviser"
+  const getBrowseUrl = () => {
+    if (profile?.role === "adviser") return "/app/adviser/browse"
+    if (profile?.role === "admin") return "/app/admin/browse"
+    return "/app/student/browse"
+  }
+
+  const getReviewsUrl = () => {
+    if (profile?.role === "admin") return "/app/admin/review-queue"
+    if (profile?.role === "adviser") return "/app/adviser/reviews"
+    return null
+  }
 
   // Role-based navigation items
   const getNavItems = () => {
     if (!isAuthenticated) {
       return [
         { name: "Home", href: "/" },
-        { name: "Browse", href: "/browse" },
         { name: "Features", href: "/#features" },
         { name: "About", href: "/#about" },
       ]
     }
 
-    // Student navigation
+    // Authenticated navigation - common items
+    const items = [{ name: "Home", href: getDashboardUrl() }]
+
+    // Add Browse link for all authenticated users
+    items.push({ name: "Browse", href: getBrowseUrl() })
+
+    // Student-specific items
     if (profile?.role === "student") {
-      return [
-        { name: "Browse", href: "/browse" },
-      ]
+      items.push({ name: "Submissions", href: "/app/student/submissions" })
     }
 
-    // Adviser navigation (view-only)
-    if (profile?.role === "adviser") {
-      return [
-        { name: "Browse", href: "/browse" },
-      ]
+    // Adviser/Admin review links
+    const reviewUrl = getReviewsUrl()
+    if (reviewUrl) {
+      items.push({ name: "Reviews", href: reviewUrl })
     }
 
-    // Admin navigation
-    if (profile?.role === "admin") {
-      return [
-        { name: "Browse", href: "/browse" },
-      ]
-    }
-
-    return []
+    return items
   }
 
   const navItems = getNavItems()
@@ -139,7 +144,7 @@ export default function Navbar() {
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
-            <a href="/" className="flex items-center gap-3">
+            <a href={isAuthenticated ? getDashboardUrl() : "/"} className="flex items-center gap-3">
               <div className="relative w-10 h-10">
                 <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-400 rounded-lg rotate-45 transform" />
                 <div className="absolute inset-1 bg-[#0a0612] rounded-md rotate-45 transform" />

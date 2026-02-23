@@ -1,7 +1,7 @@
 import Navbar from "@/components/navbar"
 import HeroSection from "@/components/hero-section"
 import FeaturesSection from "@/components/features-section"
-import AccessRulesSection from "@/components/access-rules-section"
+import RoleWorkflowSection from "@/components/role-workflow-section"
 import ShowcaseSection from "@/components/showcase-section"
 import CTASection from "@/components/cta-section"
 import Footer from "@/components/footer"
@@ -26,7 +26,7 @@ export default function Home() {
       <Navbar />
       <HeroSection />
       <FeaturesSection />
-      <AccessRulesSection />
+      <RoleWorkflowSection />
       <ShowcaseSection />
       <CTASection />
       <Footer />

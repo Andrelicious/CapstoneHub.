@@ -1,8 +1,30 @@
 import { updateSession } from "@/lib/supabase/middleware"
+import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 
 export async function middleware(request: NextRequest) {
-  return await updateSession(request)
+  const response = await updateSession(request)
+  const pathname = request.nextUrl.pathname
+
+  // Get user from session
+  const user = response.cookies.get("sb-auth-token")?.value
+
+  // Marketing routes (public)
+  const publicRoutes = ["/", "/login", "/register", "/about", "/features"]
+  const isPublicRoute = publicRoutes.includes(pathname)
+
+  // Authenticated system routes
+  const isAppRoute = pathname.startsWith("/app")
+
+  // If not authenticated and trying to access /app routes, redirect to login
+  if (isAppRoute && !user) {
+    return NextResponse.redirect(new URL("/login", request.url))
+  }
+
+  // If authenticated and trying to access login/register, let updateSession handle it
+  // (it will already have proper redirect logic in place)
+
+  return response
 }
 
 export const config = {
