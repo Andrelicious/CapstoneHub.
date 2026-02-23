@@ -107,7 +107,6 @@ export default function Navbar() {
     if (profile?.role === "student") {
       return [
         { name: "Browse", href: "/browse" },
-        { name: "Submit", href: "/submit" },
       ]
     }
 
