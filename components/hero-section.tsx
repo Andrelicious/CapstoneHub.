@@ -67,8 +67,11 @@ export default function HeroSection() {
             </h1>
 
             <p className="text-xl text-gray-400 mb-10 max-w-xl leading-relaxed">
-              A central repository for CCS capstone and thesis projects. Discover, share, and preserve student research
-              excellence.
+              A secure CCS repository for capstone and thesis submissions—powered by OCR for faster review and search.
+            </p>
+
+            <p className="text-lg text-gray-500 mb-10 max-w-xl leading-relaxed">
+              Students submit documents through an OCR-based wizard. Admin reviews and approves. Advisers can browse and recommend—without final approval power.
             </p>
 
             <form onSubmit={handleSearch} className="relative mb-8 max-w-xl group">
@@ -79,7 +82,7 @@ export default function HeroSection() {
                   type="text"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search capstone projects, theses, datasets..."
+                  placeholder="Search approved capstones and theses (title, program, year, keywords)…"
                   className="w-full px-4 py-5 bg-transparent text-white placeholder-gray-500 focus:outline-none"
                 />
                 <Button
@@ -97,17 +100,17 @@ export default function HeroSection() {
                   size="lg"
                   className="bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-500 hover:to-cyan-400 text-white px-8 py-6 text-lg shadow-2xl shadow-purple-500/30 transition-all duration-300 hover:shadow-purple-500/50 hover:scale-105"
                 >
-                  Browse Projects
+                  Browse Repository
                 </Button>
               </a>
               {showUploadButton && (
-                <a href="/upload">
+                <a href={userRole ? "/submit" : "/login"}>
                   <Button
                     size="lg"
                     variant="outline"
                     className="border-purple-500/50 text-purple-300 hover:bg-purple-500/10 hover:border-purple-400 px-8 py-6 text-lg transition-all duration-300 hover:scale-105 bg-transparent"
                   >
-                    Upload Capstone
+                    Submit Capstone
                   </Button>
                 </a>
               )}
@@ -120,8 +123,8 @@ export default function HeroSection() {
                 <p className="text-gray-500 text-sm">Projects</p>
               </div>
               <div>
-                <p className="text-3xl font-bold text-white">50+</p>
-                <p className="text-gray-500 text-sm">Datasets</p>
+                <p className="text-3xl font-bold text-white">20+</p>
+                <p className="text-gray-500 text-sm">Programs</p>
               </div>
               <div>
                 <p className="text-3xl font-bold text-white">1,200+</p>

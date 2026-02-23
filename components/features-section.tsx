@@ -5,30 +5,30 @@ import { Upload, Search, Users, Shield } from "lucide-react"
 const features = [
   {
     icon: Upload,
-    title: "Upload & Submit",
+    title: "Upload & Submit (Students)",
     description:
-      "Students upload capstone or thesis documents, review submission details, and submit their work for adviser review and administrative approval.",
+      "Students submit capstone/thesis PDFs through an OCR-based wizard that extracts text for review and future search.",
     gradient: "from-purple-500 to-purple-700",
   },
   {
     icon: Search,
     title: "Search & Browse Research",
     description:
-      "Students, advisers, and administrators browse approved research projects using title, program, year, and advanced search tools.",
+      "Students, advisers, and admins browse approved works using filters like title, program, year, and OCR-powered search.",
     gradient: "from-blue-500 to-blue-700",
   },
   {
     icon: Users,
     title: "Adviser Review & Recommendations",
     description:
-      "Advisers review student submissions, provide remarks, request revisions, and recommend works for final approval.",
+      "Advisers can view submissions, give remarks, request revisions, and recommend approval—without publishing authority.",
     gradient: "from-cyan-500 to-cyan-700",
   },
   {
     icon: Shield,
     title: "Admin Approval & Governance",
     description:
-      "Administrators perform final approval, publish documents to the repository, manage users and roles, and generate academic reports.",
+      "Admins finalize approval or rejection, manage users and records, and publish approved works to the repository.",
     gradient: "from-pink-500 to-purple-600",
   },
 ]
@@ -53,8 +53,7 @@ export default function FeaturesSection() {
             </span>
           </h2>
           <p className="text-gray-400 text-lg max-w-2xl mx-auto">
-            A comprehensive platform designed specifically for the College of Computer Studies to archive and showcase
-            academic excellence.
+            A complete workflow for submission, OCR extraction, review, and repository access.
           </p>
         </div>
 

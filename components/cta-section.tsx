@@ -1,9 +1,27 @@
 "use client"
 
+import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles } from "lucide-react"
+import { createBrowserClient } from "@supabase/ssr"
 
 export default function CTASection() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false)
+
+  useEffect(() => {
+    const checkAuth = async () => {
+      const supabase = createBrowserClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      )
+      const {
+        data: { session },
+      } = await supabase.auth.getSession()
+      setIsLoggedIn(!!session?.user)
+    }
+    checkAuth()
+  }, [])
+
   return (
     <section className="py-32 relative">
       <div className="max-w-7xl mx-auto px-6 lg:px-8 relative z-10">
@@ -34,7 +52,7 @@ export default function CTASection() {
               </div>
 
               <h2 className="text-4xl md:text-5xl lg:text-6xl font-bold text-white mb-6 text-balance">
-                Start uploading your
+                Start submitting your
                 <br />
                 <span className="bg-gradient-to-r from-purple-400 via-blue-400 to-cyan-400 bg-clip-text text-transparent">
                   capstone today.
@@ -42,24 +60,28 @@ export default function CTASection() {
               </h2>
 
               <p className="text-gray-400 text-lg md:text-xl max-w-2xl mx-auto mb-10">
-                Join hundreds of CCS students who have already preserved their research for future generations.
+                Securely upload your PDF, let OCR extract the text, and track your approval status.
               </p>
 
               <div className="flex flex-wrap justify-center gap-4">
-                <Button
-                  size="lg"
-                  className="bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-500 hover:to-cyan-400 text-white px-10 py-7 text-lg shadow-2xl shadow-purple-500/30 transition-all duration-300 hover:shadow-purple-500/50 hover:scale-105 group"
-                >
-                  Get Started
-                  <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
-                </Button>
-                <Button
-                  size="lg"
-                  variant="outline"
-                  className="border-white/20 text-white hover:bg-white/10 px-10 py-7 text-lg transition-all duration-300 hover:scale-105 bg-transparent"
-                >
-                  Learn More
-                </Button>
+                <a href={isLoggedIn ? "/submit" : "/register"}>
+                  <Button
+                    size="lg"
+                    className="bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-500 hover:to-cyan-400 text-white px-10 py-7 text-lg shadow-2xl shadow-purple-500/30 transition-all duration-300 hover:shadow-purple-500/50 hover:scale-105 group"
+                  >
+                    Get Started
+                    <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                  </Button>
+                </a>
+                <a href="/#features">
+                  <Button
+                    size="lg"
+                    variant="outline"
+                    className="border-white/20 text-white hover:bg-white/10 px-10 py-7 text-lg transition-all duration-300 hover:scale-105 bg-transparent"
+                  >
+                    Learn More
+                  </Button>
+                </a>
               </div>
             </div>
           </div>
