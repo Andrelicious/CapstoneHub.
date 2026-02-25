@@ -24,8 +24,8 @@ export default function Footer() {
       } = await supabase.auth.getSession()
       if (session?.user) {
         setIsAuthenticated(true)
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single()
-        setRole(profile?.role || "student")
+        // Use user metadata to avoid RLS infinite recursion on profiles table
+        setRole(session.user.user_metadata?.role || "student")
       } else {
         setIsAuthenticated(false)
         setRole(null)
@@ -42,9 +42,9 @@ export default function Footer() {
   }
 
   const getDashboardPath = () => {
-    if (role === "admin") return "/admin/dashboard"
-    if (role === "adviser") return "/adviser/dashboard"
-    return "/student/dashboard"
+    if (role === "admin") return "/app/admin/dashboard"
+    if (role === "adviser") return "/app/adviser/dashboard"
+    return "/app/student/dashboard"
   }
 
   const navigate = (path: string) => {
