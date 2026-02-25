@@ -26,12 +26,19 @@ export default function LoginPage() {
     return supabaseRef.current
   }
 
-  // Check if already logged in
+  // Check if already logged in and redirect to dashboard
   useEffect(() => {
     const supabase = getSupabase()
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        window.location.href = "/"
+      if (session?.user) {
+        const role = session.user.user_metadata?.role || "student"
+        if (role === "admin") {
+          window.location.href = "/admin/dashboard"
+        } else if (role === "adviser") {
+          window.location.href = "/adviser/dashboard"
+        } else {
+          window.location.href = "/student/dashboard"
+        }
       }
     })
   }, [])
@@ -57,9 +64,8 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
-
-      const role = profile?.role || "student"
+      // Use user metadata to avoid RLS infinite recursion
+      const role = data.user.user_metadata?.role || "student"
 
       if (role === "admin") {
         window.location.href = "/admin/dashboard"

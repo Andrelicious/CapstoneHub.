@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation"
 
 export default function StudentDashboardRedirect() {
-  redirect("/app/student/dashboard")
+  redirect("/student/dashboard")
 }

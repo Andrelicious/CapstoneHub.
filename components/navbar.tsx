@@ -85,21 +85,9 @@ export default function Navbar() {
   }
 
   const getDashboardUrl = () => {
-    if (profile?.role === "adviser") return "/app/adviser/dashboard"
-    if (profile?.role === "admin") return "/app/admin/dashboard"
-    return "/app/student/dashboard"
-  }
-
-  const getBrowseUrl = () => {
-    if (profile?.role === "adviser") return "/app/adviser/browse"
-    if (profile?.role === "admin") return "/app/admin/browse"
-    return "/app/student/browse"
-  }
-
-  const getReviewsUrl = () => {
-    if (profile?.role === "admin") return "/app/admin/review-queue"
-    if (profile?.role === "adviser") return "/app/adviser/reviews"
-    return null
+    if (profile?.role === "adviser") return "/adviser/dashboard"
+    if (profile?.role === "admin") return "/admin/dashboard"
+    return "/student/dashboard"
   }
 
   // Role-based navigation items
@@ -107,26 +95,17 @@ export default function Navbar() {
     if (!isAuthenticated) {
       return [
         { name: "Home", href: "/" },
-        { name: "Features", href: "/#features" },
-        { name: "About", href: "/#about" },
+        { name: "Browse", href: "/browse" },
       ]
     }
 
-    // Authenticated navigation - common items
+    // Authenticated navigation - common items for all roles
     const items = [{ name: "Home", href: getDashboardUrl() }]
+    items.push({ name: "Browse", href: "/browse" })
 
-    // Add Browse link for all authenticated users
-    items.push({ name: "Browse", href: getBrowseUrl() })
-
-    // Student-specific items
+    // Student-specific: Submit button (only one entry point)
     if (profile?.role === "student") {
-      items.push({ name: "Submissions", href: "/app/student/submissions" })
-    }
-
-    // Adviser/Admin review links
-    const reviewUrl = getReviewsUrl()
-    if (reviewUrl) {
-      items.push({ name: "Reviews", href: reviewUrl })
+      items.push({ name: "Submit", href: "/submit" })
     }
 
     return items
