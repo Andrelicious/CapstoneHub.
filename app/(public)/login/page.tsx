@@ -2,14 +2,14 @@
 
 import type React from "react"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from "lucide-react"
 import AuthLayout from "@/components/auth-layout"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
@@ -17,18 +17,10 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-
-  const getSupabase = () => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient()
-    }
-    return supabaseRef.current
-  }
 
   // Check if already logged in and redirect to dashboard
   useEffect(() => {
-    const supabase = getSupabase()
+    const supabase = getSupabaseClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const role = session.user.user_metadata?.role || "student"
@@ -50,7 +42,7 @@ export default function LoginPage() {
     setError(null)
     setLoading(true)
 
-    const supabase = getSupabase()
+    const supabase = getSupabaseClient()
 
     const { data, error: signInError } = await supabase.auth.signInWithPassword({
       email,
@@ -84,7 +76,7 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
-    const supabase = getSupabase()
+    const supabase = getSupabaseClient()
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider,

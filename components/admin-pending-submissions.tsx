@@ -26,7 +26,7 @@ import {
   TrendingUp,
   Loader2,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 interface Capstone {
   id: string
@@ -65,7 +65,7 @@ export default function AdminPendingSubmissions({ initialCapstones }: AdminPendi
     if (!selectedCapstone || !actionType) return
 
     setIsLoading(true)
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
 
     try {
       const updateData: { status: string; rejection_reason?: string } = {

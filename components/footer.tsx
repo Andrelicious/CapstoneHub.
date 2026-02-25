@@ -1,24 +1,16 @@
 "use client"
 
-import { useEffect, useState, useRef } from "react"
-import { createClient } from "@/lib/supabase/client"
+import { useEffect, useState } from "react"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 export default function Footer() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [role, setRole] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-
-  const getSupabase = () => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient()
-    }
-    return supabaseRef.current
-  }
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = getSupabase()
+      const supabase = getSupabaseClient()
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -36,7 +28,7 @@ export default function Footer() {
   }, [])
 
   const handleLogout = async () => {
-    const supabase = getSupabase()
+    const supabase = getSupabaseClient()
     await supabase.auth.signOut()
     window.location.href = "/"
   }

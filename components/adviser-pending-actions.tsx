@@ -2,11 +2,11 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Clock, Calendar, Eye, Check, X, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 interface Capstone {
   id: string
@@ -27,14 +27,6 @@ export function AdviserPendingActions({ capstones: initialCapstones }: AdviserPe
   const [capstones, setCapstones] = useState(initialCapstones)
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [actionMessage, setActionMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-
-  const getSupabase = () => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient()
-    }
-    return supabaseRef.current
-  }
 
   const handleRecommend = async (e: React.MouseEvent, capstone: Capstone, recommendation: "approved" | "rejected") => {
     e.preventDefault()
@@ -47,7 +39,7 @@ export function AdviserPendingActions({ capstones: initialCapstones }: AdviserPe
     const prevCapstones = capstones
     setCapstones((prev) => prev.filter((c) => c.id !== capstone.id))
 
-    const supabase = getSupabase()
+    const supabase = getSupabaseClient()
 
     // For advisers, we set status to "recommended" instead of direct approval
     // Admin will do final approval

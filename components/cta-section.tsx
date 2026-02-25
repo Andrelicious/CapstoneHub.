@@ -3,17 +3,14 @@
 import { useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { ArrowRight, Sparkles } from "lucide-react"
-import { createBrowserClient } from "@supabase/ssr"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 export default function CTASection() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      )
+      const supabase = getSupabaseClient()
       const {
         data: { session },
       } = await supabase.auth.getSession()

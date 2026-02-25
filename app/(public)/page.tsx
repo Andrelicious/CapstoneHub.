@@ -1,24 +1,15 @@
 "use client"
 
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import { Zap, BookOpen, CheckCircle2 } from "lucide-react"
 
 export default function Home() {
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-
-  const getSupabase = () => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient()
-    }
-    return supabaseRef.current
-  }
-
   // Check if already logged in and redirect to dashboard
   useEffect(() => {
-    const supabase = getSupabase()
+    const supabase = getSupabaseClient()
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         const role = session.user.user_metadata?.role || "student"

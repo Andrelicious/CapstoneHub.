@@ -3,7 +3,7 @@
 import React from "react"
 
 import { useEffect, useState } from 'react'
-import { createClient } from '@/lib/supabase/client'
+import { getSupabaseClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { AlertCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -18,7 +18,7 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {

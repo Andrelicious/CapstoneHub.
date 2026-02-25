@@ -16,7 +16,7 @@ import {
   FileText,
   Loader2,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 
 interface UserProfile {
@@ -61,7 +61,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
     const fetchPendingItems = async () => {
       setLoadingPending(true)
       try {
-        const supabase = createClient()
+        const supabase = getSupabaseClient()
         const { data, error } = await supabase
           .from("capstones")
           .select("id, title, status, created_at, uploader_id")
@@ -144,7 +144,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
 
   const handleSignOut = async () => {
     setSigningOut(true)
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     await supabase.auth.signOut()
     onClose()
     window.location.href = "/"

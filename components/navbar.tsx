@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Upload } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 import ProfilePanel from "@/components/profile-panel"
 import { NotificationDropdown } from "@/components/notification-dropdown"
@@ -32,7 +32,7 @@ export default function Navbar() {
   }, [])
 
   useEffect(() => {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
 
     // Check session immediately (sync from storage if available)
     supabase.auth.getSession().then(({ data: { session } }) => {

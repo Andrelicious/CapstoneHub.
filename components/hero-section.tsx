@@ -8,7 +8,7 @@ import { Search } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import AbstractShapes from "@/components/abstract-shapes"
 import ParticleField from "@/components/particle-field"
-import { createBrowserClient } from "@supabase/ssr"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 export default function HeroSection() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -17,18 +17,13 @@ export default function HeroSection() {
 
   useEffect(() => {
     const checkUserRole = async () => {
-      const supabase = createBrowserClient(
-        process.env.NEXT_PUBLIC_SUPABASE_URL!,
-        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      )
+      const supabase = getSupabaseClient()
       const {
         data: { session },
       } = await supabase.auth.getSession()
       if (session?.user) {
-        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single()
-        if (profile) {
-          setUserRole(profile.role)
-        }
+        // Use user metadata to avoid RLS recursion issues
+        setUserRole(session.user.user_metadata?.role || "student")
       }
     }
     checkUserRole()

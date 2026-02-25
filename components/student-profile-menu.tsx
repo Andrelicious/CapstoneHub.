@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import { User, Settings, LogOut } from "lucide-react"
 
 interface Profile {
@@ -20,7 +20,7 @@ export function StudentProfileMenu() {
 
   useEffect(() => {
     async function loadProfile() {
-      const supabase = createClient()
+      const supabase = getSupabaseClient()
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -51,7 +51,7 @@ export function StudentProfileMenu() {
       .toUpperCase() || "?"
 
   const handleLogout = async () => {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     await supabase.auth.signOut()
     window.location.href = "/"
   }

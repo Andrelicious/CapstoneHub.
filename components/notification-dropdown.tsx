@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import { Bell, CheckCircle2, XCircle, FileText, Clock } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 interface Notification {
   id: string
@@ -51,7 +51,7 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
     const fetchNotifications = async () => {
       setLoading(true)
       try {
-        const supabase = createClient()
+        const supabase = getSupabaseClient()
         const { data, error } = await supabase
           .from("notifications")
           .select("*")
@@ -83,16 +83,16 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
 
   const markAsRead = async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     await supabase.from("notifications").update({ is_read: true }).eq("id", id)
   }
 
   const markAllAsRead = async () => {
     const unreadIds = notifications.filter((n) => !n.is_read).map((n) => n.id)
-    if (unreadIds.length === 0) return
+    if (!unreadIds.length) return
 
     setNotifications((prev) => prev.map((n) => ({ ...n, is_read: true })))
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     await supabase.from("notifications").update({ is_read: true }).in("id", unreadIds)
   }
 

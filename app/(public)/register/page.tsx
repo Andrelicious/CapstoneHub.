@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Mail, Lock, User, GraduationCap, ArrowRight, Users, Shield, Loader2 } from "lucide-react"
 import AuthLayout from "@/components/auth-layout"
 import type { UserRole } from "@/types"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 const roleOptions: { value: UserRole; label: string; description: string; icon: React.ElementType }[] = [
   {
@@ -38,14 +38,6 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const supabaseRef = useRef<ReturnType<typeof createClient> | null>(null)
-
-  const getSupabase = () => {
-    if (!supabaseRef.current) {
-      supabaseRef.current = createClient()
-    }
-    return supabaseRef.current
-  }
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -81,7 +73,7 @@ export default function RegisterPage() {
     setLoading(true)
 
     try {
-      const supabase = getSupabase()
+      const supabase = getSupabaseClient()
 
       // Sign up with Supabase Auth
       const { data: authData, error: signUpError } = await supabase.auth.signUp({
