@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
 import { ArrowLeft, Bell, Shield, Palette, Loader2, Trash2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import Navbar from "@/components/navbar"
@@ -24,7 +24,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient()
+      const supabase = getSupabaseClient()
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -40,7 +40,7 @@ export default function SettingsPage() {
   }, [router])
 
   const handleLogout = async () => {
-    const supabase = createClient()
+    const supabase = getSupabaseClient()
     await supabase.auth.signOut()
     router.push("/")
     router.refresh()

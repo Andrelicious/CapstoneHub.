@@ -24,7 +24,7 @@ import {
   Loader2,
   ArrowLeft,
 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 
 const categories = [
   "Artificial Intelligence",
@@ -39,8 +39,6 @@ const categories = [
   "Cloud Computing",
   "Other",
 ]
-
-const supabase = createClient()
 
 export default function UploadPage() {
   const router = useRouter()
@@ -64,6 +62,7 @@ export default function UploadPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
+      const supabase = getSupabaseClient()
       const {
         data: { user },
       } = await supabase.auth.getUser()

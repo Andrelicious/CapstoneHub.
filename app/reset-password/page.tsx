@@ -4,7 +4,7 @@ import type React from "react"
 
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -23,7 +23,7 @@ export default function ResetPasswordPage() {
   useEffect(() => {
     // Check if we have a valid session from the reset link
     const checkSession = async () => {
-      const supabase = createClient()
+      const supabase = getSupabaseClient()
       const {
         data: { session },
       } = await supabase.auth.getSession()
@@ -53,7 +53,7 @@ export default function ResetPasswordPage() {
     setLoading(true)
 
     try {
-      const supabase = createClient()
+      const supabase = getSupabaseClient()
       const { error } = await supabase.auth.updateUser({ password })
 
       if (error) {

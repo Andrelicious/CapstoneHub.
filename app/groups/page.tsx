@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { ArrowLeft, Users, Plus, Loader2 } from "lucide-react"
-import { createClient } from "@/lib/supabase/client"
+import { getSupabaseClient } from "@/lib/supabase/client"
 import Link from "next/link"
 import Navbar from "@/components/navbar"
 
@@ -15,7 +15,7 @@ export default function GroupsPage() {
 
   useEffect(() => {
     const checkAuth = async () => {
-      const supabase = createClient()
+      const supabase = getSupabaseClient()
       const {
         data: { user },
       } = await supabase.auth.getUser()
