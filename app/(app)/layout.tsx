@@ -34,19 +34,8 @@ export default async function AppLayout({
     redirect("/login")
   }
 
-  // Fetch user profile to get role (using service role to avoid RLS issues)
-  let userRole = "student"
-  try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile } = await profileRes.json()
-      userRole = profile?.role || "student"
-    }
-  } catch (e) {
-    console.error("Failed to fetch profile:", e)
-  }
+  // Get user role from metadata (already loaded, no fetch needed)
+  const userRole = user.user_metadata?.role || "student"
 
   return (
     <div className="min-h-screen bg-[#0a0612] flex flex-col">
