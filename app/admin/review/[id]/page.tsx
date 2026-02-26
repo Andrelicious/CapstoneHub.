@@ -45,27 +45,34 @@ async function getSubmissionData(id: string) {
     return { redirect: '/login' }
   }
 
-  // Fetch admin profile using service role API to avoid RLS infinite recursion
-  let adminProfile = null
-  try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile: p } = await profileRes.json()
-      adminProfile = p
-    }
-  } catch (e) {
-    console.error('Failed to fetch profile:', e)
-  }
-
+  // Get role from user metadata (already loaded, no fetch needed)
+  const userRole = user.user_metadata?.role || "student"
+  
   // RBAC: Only admins can access review pages
-  if (adminProfile?.role !== 'admin') {
-    if (adminProfile?.role === 'adviser') return { redirect: '/adviser/dashboard' }
+  if (userRole !== 'admin') {
+    if (userRole === 'adviser') return { redirect: '/adviser/dashboard' }
     return { redirect: '/student/dashboard' }
   }
 
-  const { data: dataset } = await supabase
+  // Use service role to bypass RLS and fetch the dataset
+  const supabaseAdmin = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
+          } catch {}
+        },
+      },
+    },
+  )
+
+  const { data: dataset } = await supabaseAdmin
     .from('datasets')
     .select('*')
     .eq('id', id)
@@ -75,22 +82,10 @@ async function getSubmissionData(id: string) {
     return { redirect: '/admin/dashboard', notFound: true }
   }
 
-  // Fetch student profile and OCR results using service role to avoid RLS
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const dataSupabase = serviceRoleKey
-    ? createServerClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, serviceRoleKey, {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll()
-          },
-          setAll() {},
-        },
-      })
-    : supabase
+  // Fetch student profile and OCR results using service role (already created above)
+  const { data: studentProfile } = await supabaseAdmin.from('profiles').select('display_name').eq('id', dataset.user_id).single()
 
-  const { data: studentProfile } = await dataSupabase.from('profiles').select('display_name').eq('id', dataset.user_id).single()
-
-  const { data: ocrResults } = await dataSupabase.from('ocr_results').select('*').eq('dataset_id', id).single()
+  const { data: ocrResults } = await supabaseAdmin.from('ocr_results').select('*').eq('dataset_id', id).single()
 
   // Transform dataset to submission format
   const transformedSubmission = {
