@@ -9,8 +9,8 @@ export async function middleware(request: NextRequest) {
   // Get user from session
   const user = response.cookies.get("sb-auth-token")?.value
 
-  // Marketing routes (public)
-  const publicRoutes = ["/", "/login", "/register", "/about", "/features"]
+  // Public routes (don't require authentication)
+  const publicRoutes = ["/", "/login", "/register", "/browse"]
   const isPublicRoute = publicRoutes.includes(pathname)
 
   // Authenticated system routes
