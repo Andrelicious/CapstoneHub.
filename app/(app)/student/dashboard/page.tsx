@@ -1,6 +1,7 @@
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -50,30 +51,22 @@ export default async function StudentDashboardPage() {
     if (userRole === 'adviser') redirect('/adviser/dashboard')
   }
 
-  // Use service role to bypass RLS and avoid infinite recursion
-  const supabaseAdmin = createServerClient(
+  // Use service role client directly (not createServerClient) to properly bypass RLS
+  const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-          } catch {}
-        },
-      },
-    },
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
-  // Fetch student's own submissions using service role (bypasses RLS)
-  const { data: submissions } = await supabaseAdmin
+  // Fetch student's own submissions using service role (bypasses RLS entirely)
+  const { data: submissions, error: submissionsError } = await supabaseAdmin
     .from('datasets')
-    .select('*')
+    .select('id,title,status,created_at,program,school_year')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false })
+  
+  if (submissionsError) {
+    console.error('[v0] Failed to fetch submissions:', submissionsError)
+  }
 
   const datasetsList = submissions || []
   const stats = {

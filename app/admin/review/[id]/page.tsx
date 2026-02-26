@@ -1,5 +1,6 @@
 import { cookies } from 'next/headers'
 import { createServerClient } from '@supabase/ssr'
+import { createClient } from '@supabase/supabase-js'
 import { redirect } from 'next/navigation'
 import { AdminReviewPage } from '@/components/admin-review-page'
 
@@ -54,27 +55,15 @@ async function getSubmissionData(id: string) {
     return { redirect: '/student/dashboard' }
   }
 
-  // Use service role to bypass RLS and fetch the dataset
-  const supabaseAdmin = createServerClient(
+  // Use service role client directly to bypass RLS entirely
+  const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll()
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-          } catch {}
-        },
-      },
-    },
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   )
 
   const { data: dataset } = await supabaseAdmin
     .from('datasets')
-    .select('*')
+    .select('id,title,program,doc_type,user_id,created_at,status,description')
     .eq('id', id)
     .single()
 
@@ -82,10 +71,10 @@ async function getSubmissionData(id: string) {
     return { redirect: '/admin/dashboard', notFound: true }
   }
 
-  // Fetch student profile and OCR results using service role (already created above)
+  // Fetch student profile and OCR results using service role (selective columns to avoid RLS issues)
   const { data: studentProfile } = await supabaseAdmin.from('profiles').select('display_name').eq('id', dataset.user_id).single()
 
-  const { data: ocrResults } = await supabaseAdmin.from('ocr_results').select('*').eq('dataset_id', id).single()
+  const { data: ocrResults } = await supabaseAdmin.from('ocr_results').select('preview_text,full_text,quality_flags').eq('dataset_id', id).single()
 
   // Transform dataset to submission format
   const transformedSubmission = {
