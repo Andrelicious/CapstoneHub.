@@ -25,23 +25,12 @@ export default async function AdminDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch profile using service role API to avoid RLS infinite recursion
-  let profile = null
-  try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile: p } = await profileRes.json()
-      profile = p
-    }
-  } catch (e) {
-    console.error('Failed to fetch profile:', e)
-  }
-
+  // Get role from user metadata (no RLS issues)
+  const userRole = user.user_metadata?.role || "student"
+  
   // RBAC: Only admins can access admin dashboard
-  if (profile?.role !== "admin") {
-    if (profile?.role === "adviser") return redirect("/adviser/dashboard")
+  if (userRole !== "admin") {
+    if (userRole === "adviser") return redirect("/adviser/dashboard")
     return redirect("/student/dashboard")
   }
 

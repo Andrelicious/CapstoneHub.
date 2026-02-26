@@ -38,29 +38,15 @@ export default async function StudentDashboardPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  // Fetch profile using service role API to avoid RLS infinite recursion
-  let profile = null
-  try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile: p } = await profileRes.json()
-      profile = p
-    }
-  } catch (e) {
-    console.error('Failed to fetch profile:', e)
-  }
-
-  const userRole = profile?.role || 'student'
+  // Get profile data from user metadata (already loaded, no RLS issues)
+  const userRole = user.user_metadata?.role || 'student'
+  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Student'
 
   // RBAC: Only students can access this page
   if (userRole !== 'student') {
     if (userRole === 'admin') redirect('/admin/dashboard')
     if (userRole === 'adviser') redirect('/adviser/dashboard')
   }
-
-  const displayName = profile?.display_name || user.email?.split('@')[0] || 'Student'
 
   // Fetch student's own submissions
   const { data: submissions } = await supabase
