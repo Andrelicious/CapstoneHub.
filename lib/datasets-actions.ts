@@ -38,7 +38,7 @@ export async function createDatasetDraft(data: {
       tags: data.tags,
       status: 'draft',
     })
-    .select()
+    .select('id,title,status,created_at')
     .single()
 
   if (error) {
@@ -219,10 +219,9 @@ export async function approveDataset(datasetId: string) {
     throw new Error('Not authenticated')
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-
-  if (profile?.role !== 'admin') {
+  // Check if user is admin using user metadata
+  const userRole = user.user_metadata?.role || 'student'
+  if (userRole !== 'admin') {
     throw new Error('Only admins can approve datasets')
   }
 
@@ -254,10 +253,9 @@ export async function returnDataset(datasetId: string, remarks: string) {
     throw new Error('Not authenticated')
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-
-  if (profile?.role !== 'admin') {
+  // Check if user is admin using user metadata
+  const userRole = user.user_metadata?.role || 'student'
+  if (userRole !== 'admin') {
     throw new Error('Only admins can return datasets')
   }
 
@@ -289,10 +287,9 @@ export async function rejectDataset(datasetId: string, remarks: string) {
     throw new Error('Not authenticated')
   }
 
-  // Check if user is admin
-  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
-
-  if (profile?.role !== 'admin') {
+  // Check if user is admin using user metadata
+  const userRole = user.user_metadata?.role || 'student'
+  if (userRole !== 'admin') {
     throw new Error('Only admins can reject datasets')
   }
 
@@ -316,9 +313,10 @@ export async function rejectDataset(datasetId: string, remarks: string) {
 export async function getPendingDatasets() {
   const supabase = await createClient()
 
+  // Select specific columns to avoid RLS infinite recursion
   const { data: datasets, error } = await supabase
     .from('datasets')
-    .select(`*, profiles(display_name, id)`)
+    .select('id,title,program,doc_type,user_id,created_at,status')
     .eq('status', 'pending_admin_review')
     .order('created_at', { ascending: false })
 
@@ -339,22 +337,23 @@ export async function getDatasetById(datasetId: string) {
     data: { user },
   } = await supabase.auth.getUser()
 
+  // Use selective columns to avoid RLS infinite recursion
   let query = supabase
     .from('datasets')
-    .select(`*, profiles(display_name, id), ocr_results(*)`)
+    .select('id,title,description,program,doc_type,user_id,school_year,category,tags,status,created_at,file_path,file_name')
     .eq('id', datasetId)
 
   // If user is not authenticated, only show approved datasets
   if (!user) {
     query = query.eq('status', 'approved')
   } else {
-    // Check role for access control
-    const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+    // Get role from user metadata instead of querying profiles table
+    const userRole = user.user_metadata?.role || 'student'
 
-    if (profile?.role === 'admin') {
+    if (userRole === 'admin') {
       // Admins can see all pending datasets
       query = query.in('status', ['pending_admin_review', 'approved', 'draft', 'returned'])
-    } else if (profile?.role === 'adviser') {
+    } else if (userRole === 'adviser') {
       // Advisers can only see approved datasets
       query = query.eq('status', 'approved')
     } else {
