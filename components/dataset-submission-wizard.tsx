@@ -206,12 +206,12 @@ export function DatasetSubmissionWizard() {
   return (
     <div className="min-h-screen bg-[#0a0612]">
       {/* Background effects */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px]" />
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[150px]" />
       </div>
 
-      <main className="relative pt-20 pb-20">
+      <main className="relative z-10 pt-20 pb-20">
         <div className="max-w-3xl mx-auto px-6">
           {/* Progress indicator */}
           <div className="mb-10">
@@ -396,11 +396,11 @@ export function DatasetSubmissionWizard() {
 
           {/* Navigation buttons */}
           {step < 5 && (
-            <div className="flex gap-4 mt-8">
+            <div className="flex gap-4 mt-8 relative z-20">
               <Button
                 onClick={handlePrev}
                 variant="outline"
-                className="flex-1 border-white/20 text-white hover:bg-white/10 bg-transparent"
+                className="flex-1 border-white/20 text-white hover:bg-white/10 bg-transparent cursor-pointer transition-all"
                 disabled={step === 1 || loading}
               >
                 <ChevronLeft className="w-4 h-4 mr-2" />
