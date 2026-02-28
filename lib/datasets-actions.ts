@@ -37,6 +37,7 @@ export async function createDatasetDraft(data: {
       category: data.category,
       tags: data.tags,
       status: 'draft',
+      license: 'CC-BY-4.0', // Default license for educational content
     })
     .select('id,title,status,created_at')
     .single()
