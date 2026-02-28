@@ -135,14 +135,22 @@ export function DatasetSubmissionWizard() {
 
       setLoading(true)
       try {
-        await uploadDatasetFile(datasetId, file)
+        console.log('[v0] Starting file upload for dataset:', datasetId, 'file:', file.name)
+        const result = await uploadDatasetFile(datasetId, file)
+        console.log('[v0] File upload successful:', result)
+        
+        console.log('[v0] Submitting for OCR processing...')
         await submitForOCR(datasetId)
+        console.log('[v0] OCR submission successful')
+        
         setOcrStatus('queued')
         setStep(3)
       } catch (error: any) {
+        console.error('[v0] File upload or OCR submission failed:', error)
+        const errorMessage = error?.message || String(error) || 'Unknown error occurred'
         toast({
           title: 'Error',
-          description: error.message,
+          description: errorMessage,
           variant: 'destructive',
         })
       } finally {

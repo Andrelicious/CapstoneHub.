@@ -54,85 +54,110 @@ export async function createDatasetDraft(data: {
  * Upload file to storage and update dataset with file path
  */
 export async function uploadDatasetFile(datasetId: string, file: File) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) {
-    throw new Error('Not authenticated')
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
+    console.log('[v0] uploadDatasetFile: Starting upload for', file.name, 'size:', file.size)
+
+    // Upload file to storage
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${datasetId}-${Date.now()}.${fileExt}`
+    const filePath = `datasets/${user.id}/${fileName}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('dataset-files')
+      .upload(filePath, file, { upsert: true })
+
+    if (uploadError) {
+      console.error('[v0] Storage upload error:', uploadError)
+      throw new Error(`File upload failed: ${uploadError.message}`)
+    }
+
+    console.log('[v0] Storage upload successful:', filePath)
+
+    // Update dataset with file info
+    const { error: updateError } = await supabase
+      .from('datasets')
+      .update({
+        file_path: filePath,
+        file_name: file.name,
+      })
+      .eq('id', datasetId)
+      .eq('user_id', user.id)
+
+    if (updateError) {
+      console.error('[v0] Dataset update error:', updateError)
+      throw new Error(`Failed to update dataset: ${updateError.message}`)
+    }
+
+    console.log('[v0] Dataset updated successfully')
+    revalidateTag('datasets')
+    return { success: true, filePath }
+  } catch (error) {
+    console.error('[v0] uploadDatasetFile error:', error)
+    throw error
   }
-
-  // Upload file to storage
-  const fileExt = file.name.split('.').pop()
-  const fileName = `${datasetId}-${Date.now()}.${fileExt}`
-  const filePath = `datasets/${user.id}/${fileName}`
-
-  const { error: uploadError } = await supabase.storage
-    .from('dataset-files')
-    .upload(filePath, file, { upsert: true })
-
-  if (uploadError) {
-    throw new Error(`File upload failed: ${uploadError.message}`)
-  }
-
-  // Update dataset with file info
-  const { error: updateError } = await supabase
-    .from('datasets')
-    .update({
-      file_path: filePath,
-      file_name: file.name,
-    })
-    .eq('id', datasetId)
-    .eq('user_id', user.id)
-
-  if (updateError) {
-    throw new Error(`Failed to update dataset: ${updateError.message}`)
-  }
-
-  revalidateTag('datasets')
-  return filePath
 }
 
 /**
  * Submit dataset for OCR processing
  */
 export async function submitForOCR(datasetId: string) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) {
-    throw new Error('Not authenticated')
+    if (!user) {
+      throw new Error('Not authenticated')
+    }
+
+    console.log('[v0] submitForOCR: Starting OCR for dataset', datasetId)
+
+    // Update dataset status to ocr_processing
+    const { error: statusError } = await supabase
+      .from('datasets')
+      .update({ status: 'ocr_processing' })
+      .eq('id', datasetId)
+      .eq('user_id', user.id)
+
+    if (statusError) {
+      console.error('[v0] OCR status update error:', statusError)
+      throw new Error(`Failed to update status: ${statusError.message}`)
+    }
+
+    console.log('[v0] Dataset status updated to ocr_processing')
+
+    // Create OCR job
+    const { error: jobError } = await supabase.from('ocr_jobs').insert({
+      dataset_id: datasetId,
+      status: 'queued',
+      attempts: 0,
+    })
+
+    if (jobError) {
+      console.error('[v0] OCR job creation error:', jobError)
+      throw new Error(`Failed to create OCR job: ${jobError.message}`)
+    }
+
+    console.log('[v0] OCR job created successfully')
+    revalidateTag('datasets')
+    revalidateTag(`dataset-${datasetId}`)
+    return { success: true }
+  } catch (error) {
+    console.error('[v0] submitForOCR error:', error)
+    throw error
   }
-
-  // Update dataset status to ocr_processing
-  const { error: statusError } = await supabase
-    .from('datasets')
-    .update({ status: 'ocr_processing' })
-    .eq('id', datasetId)
-    .eq('user_id', user.id)
-
-  if (statusError) {
-    throw new Error(`Failed to update status: ${statusError.message}`)
-  }
-
-  // Create OCR job
-  const { error: jobError } = await supabase.from('ocr_jobs').insert({
-    dataset_id: datasetId,
-    status: 'queued',
-    attempts: 0,
-  })
-
-  if (jobError) {
-    throw new Error(`Failed to create OCR job: ${jobError.message}`)
-  }
-
-  revalidateTag('datasets')
-  revalidateTag(`dataset-${datasetId}`)
   return { success: true }
 }
 
