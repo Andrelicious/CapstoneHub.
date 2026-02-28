@@ -4,6 +4,39 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidateTag } from 'next/cache'
 
 /**
+ * Fetch a draft dataset with all its data for resuming the wizard
+ */
+export async function getDraftDataset(datasetId: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    throw new Error('Not authenticated')
+  }
+
+  // Fetch the dataset with selective columns to avoid RLS issues
+  const { data: dataset, error } = await supabase
+    .from('datasets')
+    .select('id,title,description,program,doc_type,school_year,category,tags,status,file_path,file_name,user_id')
+    .eq('id', datasetId)
+    .eq('user_id', user.id)
+    .single()
+
+  if (error) {
+    throw new Error(`Failed to fetch draft: ${error.message}`)
+  }
+
+  if (!dataset) {
+    throw new Error('Draft not found or you do not have access to it')
+  }
+
+  return dataset
+}
+
+/**
  * Create or update a dataset draft
  */
 export async function createDatasetDraft(data: {
@@ -65,8 +98,6 @@ export async function uploadDatasetFile(datasetId: string, file: File) {
       throw new Error('Not authenticated')
     }
 
-    console.log('[v0] uploadDatasetFile: Starting upload for', file.name, 'size:', file.size)
-
     // Upload file to storage
     const fileExt = file.name.split('.').pop()
     const fileName = `${datasetId}-${Date.now()}.${fileExt}`
@@ -77,11 +108,8 @@ export async function uploadDatasetFile(datasetId: string, file: File) {
       .upload(filePath, file, { upsert: true })
 
     if (uploadError) {
-      console.error('[v0] Storage upload error:', uploadError)
       throw new Error(`File upload failed: ${uploadError.message}`)
     }
-
-    console.log('[v0] Storage upload successful:', filePath)
 
     // Update dataset with file info
     const { error: updateError } = await supabase
@@ -94,15 +122,12 @@ export async function uploadDatasetFile(datasetId: string, file: File) {
       .eq('user_id', user.id)
 
     if (updateError) {
-      console.error('[v0] Dataset update error:', updateError)
       throw new Error(`Failed to update dataset: ${updateError.message}`)
     }
 
-    console.log('[v0] Dataset updated successfully')
     revalidateTag('datasets')
     return { success: true, filePath }
   } catch (error) {
-    console.error('[v0] uploadDatasetFile error:', error)
     throw error
   }
 }
@@ -122,8 +147,6 @@ export async function submitForOCR(datasetId: string) {
       throw new Error('Not authenticated')
     }
 
-    console.log('[v0] submitForOCR: Starting OCR for dataset', datasetId)
-
     // Update dataset status to ocr_processing
     const { error: statusError } = await supabase
       .from('datasets')
@@ -132,11 +155,8 @@ export async function submitForOCR(datasetId: string) {
       .eq('user_id', user.id)
 
     if (statusError) {
-      console.error('[v0] OCR status update error:', statusError)
       throw new Error(`Failed to update status: ${statusError.message}`)
     }
-
-    console.log('[v0] Dataset status updated to ocr_processing')
 
     // Create OCR job
     const { error: jobError } = await supabase.from('ocr_jobs').insert({
@@ -146,16 +166,13 @@ export async function submitForOCR(datasetId: string) {
     })
 
     if (jobError) {
-      console.error('[v0] OCR job creation error:', jobError)
       throw new Error(`Failed to create OCR job: ${jobError.message}`)
     }
 
-    console.log('[v0] OCR job created successfully')
     revalidateTag('datasets')
     revalidateTag(`dataset-${datasetId}`)
     return { success: true }
   } catch (error) {
-    console.error('[v0] submitForOCR error:', error)
     throw error
   }
   return { success: true }

@@ -2,8 +2,8 @@
 
 import React from "react"
 
-import { useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -18,6 +18,7 @@ import {
   getOCRStatus,
   getOCRResults,
   submitForAdminReview,
+  getDraftDataset,
 } from '@/lib/datasets-actions'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -51,8 +52,72 @@ export function DatasetSubmissionWizard() {
   const [datasetId, setDatasetId] = useState<string>('')
   const [ocrStatus, setOcrStatus] = useState('')
   const [ocrResults, setOcrResults] = useState<any>(null)
+  const [isInitializing, setIsInitializing] = useState(true)
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { toast } = useToast()
+
+  // Load draft data if URL contains draft parameter
+  useEffect(() => {
+    const loadDraft = async () => {
+      const draftId = searchParams.get('draft')
+      if (!draftId) {
+        setIsInitializing(false)
+        return
+      }
+
+      try {
+        console.log('[v0] Loading draft:', draftId)
+        const draft = await getDraftDataset(draftId)
+        
+        // Populate form with draft data
+        setDatasetId(draft.id)
+        setFormData({
+          title: draft.title || '',
+          description: draft.description || '',
+          program: draft.program || '',
+          doc_type: draft.doc_type || 'thesis',
+          school_year: draft.school_year || new Date().getFullYear().toString(),
+          category: draft.category || '',
+          tags: Array.isArray(draft.tags) ? draft.tags.join(', ') : '',
+        })
+
+        // Determine which step to show based on draft status
+        let nextStep: WizardStep = 1
+        if (draft.file_path) {
+          nextStep = 2 // File already uploaded, but show file upload UI to indicate progress
+        }
+
+        setStep(nextStep)
+        console.log('[v0] Draft loaded successfully, resuming at step', nextStep)
+      } catch (error: any) {
+        console.error('[v0] Failed to load draft:', error)
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to load draft',
+          variant: 'destructive',
+        })
+      } finally {
+        setIsInitializing(false)
+      }
+    }
+
+    loadDraft()
+  }, [searchParams, toast])
+
+  // Show loading state while initializing
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-[#0a0612] flex items-center justify-center">
+        <Card className="p-8">
+          <div className="flex items-center gap-3">
+            <Loader2 className="w-6 h-6 animate-spin" />
+            <p className="text-lg">Loading draft...</p>
+          </div>
+        </Card>
+      </div>
+    )
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -90,7 +155,7 @@ export function DatasetSubmissionWizard() {
 
   const handleNext = async () => {
     if (step === 1) {
-      // Create dataset draft
+      // Create or validate dataset draft
       if (!formData.title) {
         toast({
           title: 'Error',
@@ -102,16 +167,22 @@ export function DatasetSubmissionWizard() {
 
       setLoading(true)
       try {
-        const dataset = await createDatasetDraft({
-          title: formData.title,
-          description: formData.description,
-          program: formData.program,
-          doc_type: formData.doc_type,
-          school_year: formData.school_year,
-          category: formData.category,
-          tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()) : [],
-        })
-        setDatasetId(dataset.id)
+        // Only create new draft if we don't already have one
+        if (!datasetId) {
+          console.log('[v0] Creating new dataset draft')
+          const dataset = await createDatasetDraft({
+            title: formData.title,
+            description: formData.description,
+            program: formData.program,
+            doc_type: formData.doc_type,
+            school_year: formData.school_year,
+            category: formData.category,
+            tags: formData.tags ? formData.tags.split(',').map((t) => t.trim()) : [],
+          })
+          setDatasetId(dataset.id)
+        } else {
+          console.log('[v0] Resuming existing draft:', datasetId)
+        }
         setStep(2)
       } catch (error: any) {
         toast({
@@ -135,18 +206,11 @@ export function DatasetSubmissionWizard() {
 
       setLoading(true)
       try {
-        console.log('[v0] Starting file upload for dataset:', datasetId, 'file:', file.name)
-        const result = await uploadDatasetFile(datasetId, file)
-        console.log('[v0] File upload successful:', result)
-        
-        console.log('[v0] Submitting for OCR processing...')
+        await uploadDatasetFile(datasetId, file)
         await submitForOCR(datasetId)
-        console.log('[v0] OCR submission successful')
-        
         setOcrStatus('queued')
         setStep(3)
       } catch (error: any) {
-        console.error('[v0] File upload or OCR submission failed:', error)
         const errorMessage = error?.message || String(error) || 'Unknown error occurred'
         toast({
           title: 'Error',
