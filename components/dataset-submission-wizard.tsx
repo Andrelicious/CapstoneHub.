@@ -20,8 +20,10 @@ import {
   submitForAdminReview,
   getDraftDataset,
 } from '@/lib/datasets-actions'
+import { DEMO_MODE, demoLog, getOCRTimeout, getOCRPlaceholder } from '@/lib/demo-mode'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
+type OCRUiState = 'idle' | 'queued' | 'processing' | 'done' | 'failed' | 'timeout'
 
 interface FormData {
   title: string
@@ -50,7 +52,11 @@ export function DatasetSubmissionWizard() {
   const [isDragging, setIsDragging] = useState(false)
   const [loading, setLoading] = useState(false)
   const [datasetId, setDatasetId] = useState<string>('')
-  const [ocrStatus, setOcrStatus] = useState('')
+  
+  // Demo-safe OCR state
+  const [ocrUiState, setOcrUiState] = useState<OCRUiState>('idle')
+  const [ocrError, setOcrError] = useState<string>('')
+  const [reviewText, setReviewText] = useState<string>('')
   const [ocrResults, setOcrResults] = useState<any>(null)
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -96,6 +102,61 @@ export function DatasetSubmissionWizard() {
       isMounted = false
     }
   }, [])
+
+  /**
+   * Demo-safe OCR polling: never blocks wizard, always completes within timeout
+   */
+  const pollOcrWithTimeout = async (id: string) => {
+    demoLog('Starting OCR poll with timeout', { id })
+    setOcrError('')
+    setOcrUiState('processing')
+
+    const start = Date.now()
+    const timeout = getOCRTimeout()
+
+    while (Date.now() - start < timeout) {
+      try {
+        const job = await getOCRStatus(id)
+        const status = (job?.status || '').toLowerCase()
+
+        demoLog('OCR status check', { status, elapsed: Date.now() - start })
+
+        // Check for failures
+        if (status.includes('fail') || status === 'error') {
+          setOcrUiState('failed')
+          setOcrError('OCR processing encountered an issue. You can continue with manual text.')
+          return
+        }
+
+        // Check for completion
+        if (status === 'done' || status === 'completed' || status === 'success') {
+          setOcrUiState('done')
+          try {
+            const results = await getOCRResults(id)
+            setOcrResults(results)
+            const extracted = results?.extracted_text || results?.text || ''
+            if (extracted) setReviewText(extracted)
+            demoLog('OCR completed successfully')
+          } catch (e) {
+            demoLog('Failed to fetch OCR results', e)
+          }
+          return
+        }
+
+        // Wait before next poll
+        await new Promise((r) => setTimeout(r, DEMO_MODE.OCR.POLL_INTERVAL_MS))
+      } catch (e) {
+        demoLog('OCR poll error', e)
+        // Continue polling on error
+      }
+    }
+
+    // Timeout reached - show placeholder but allow continuation
+    demoLog('OCR polling timeout reached')
+    setOcrUiState('timeout')
+    setOcrError('OCR is still processing in the background. You can continue with the placeholder text.')
+    setReviewText(getOCRPlaceholder())
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target
@@ -169,11 +230,11 @@ export function DatasetSubmissionWizard() {
         setLoading(false)
       }
     } else if (step === 2) {
-      // Upload file
+      // ✅ STEP 2: Upload PDF (ALWAYS advance to Step 3, OCR runs in background)
       if (!file) {
         toast({
-          title: 'Error',
-          description: 'Please select a file',
+          title: 'Required',
+          description: 'Please select a PDF file.',
           variant: 'destructive',
         })
         return
@@ -181,61 +242,75 @@ export function DatasetSubmissionWizard() {
 
       setLoading(true)
       try {
+        demoLog('Uploading file', { fileName: file.name })
         await uploadDatasetFile(datasetId, file)
-        await submitForOCR(datasetId)
-        setOcrStatus('queued')
+        
+        // ✅ Move to step 3 IMMEDIATELY - OCR runs in background (non-blocking)
+        setOcrUiState('queued')
         setStep(3)
+
+        // Fire OCR request without waiting
+        ;(async () => {
+          try {
+            demoLog('Submitting for OCR')
+            await submitForOCR(datasetId)
+            await pollOcrWithTimeout(datasetId)
+          } catch (e: any) {
+            demoLog('OCR error', e)
+            setOcrUiState('failed')
+            setOcrError('OCR service temporarily unavailable. Continue with manual review.')
+            setReviewText(getOCRPlaceholder())
+          }
+        })()
       } catch (error: any) {
-        const errorMessage = error?.message || String(error) || 'Unknown error occurred'
+        demoLog('Upload error', error)
         toast({
-          title: 'Error',
-          description: errorMessage,
+          title: 'Upload failed',
+          description: error?.message || 'Could not upload file.',
           variant: 'destructive',
         })
       } finally {
         setLoading(false)
       }
     } else if (step === 3) {
-      // Poll OCR status
-      setLoading(true)
-      try {
-        // Simulate OCR polling
-        let job = await getOCRStatus(datasetId)
-        while (job?.status !== 'done' && job?.status !== 'failed') {
-          await new Promise((resolve) => setTimeout(resolve, 1000))
-          job = await getOCRStatus(datasetId)
-          setOcrStatus(job?.status || 'processing')
-        }
-
-        if (job?.status === 'done') {
-          const results = await getOCRResults(datasetId)
-          setOcrResults(results)
-          setStep(4)
-        } else {
-          throw new Error('OCR processing failed')
-        }
-      } catch (error: any) {
+      // ✅ STEP 3: Continue to review (NEVER blocked by OCR)
+      demoLog('Moving to Step 4')
+      if (!reviewText.trim()) {
+        setReviewText(getOCRPlaceholder())
+      }
+      setStep(4)
+    } else if (step === 4) {
+      // ✅ STEP 4: Submit for Admin Review
+      if (!datasetId) {
         toast({
           title: 'Error',
-          description: error.message,
+          description: 'Missing dataset ID.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      setLoading(true)
+      try {
+        demoLog('Submitting for admin review')
+        await submitForAdminReview(datasetId)
+        toast({
+          title: 'Success!',
+          description: 'Your submission is now pending admin review.',
+        })
+        setStep(5)
+        setTimeout(() => router.push('/student/dashboard'), 1500)
+      } catch (error: any) {
+        demoLog('Submission error', error)
+        toast({
+          title: 'Error',
+          description: error?.message || 'Failed to submit.',
           variant: 'destructive',
         })
       } finally {
         setLoading(false)
       }
-    } else if (step === 4) {
-      // Submit for admin review
-      setLoading(true)
-      try {
-        await submitForAdminReview(datasetId)
-        toast({
-          title: 'Success',
-          description: 'Dataset submitted for admin review',
-        })
-        setStep(5)
-        setTimeout(() => router.push('/student/dashboard'), 2000)
-      } catch (error: any) {
-        toast({
+    }
           title: 'Error',
           description: error.message,
           variant: 'destructive',
@@ -400,32 +475,68 @@ export function DatasetSubmissionWizard() {
             </Card>
           )}
 
-          {/* Step 3: OCR Processing */}
+          {/* Step 3: OCR Processing (✅ Non-blocking, you can continue while OCR processes) */}
           {step === 3 && (
             <Card className="bg-white/5 backdrop-blur border-white/10 p-8">
-              <h2 className="text-2xl font-bold text-white mb-6">OCR Processing</h2>
+              <h2 className="text-2xl font-bold text-white mb-2">OCR Processing</h2>
+              <p className="text-gray-400 text-sm mb-6">
+                Demo-safe: OCR runs in the background. You can proceed to the next step anytime.
+              </p>
+              
               <div className="text-center py-8">
-                <Loader2 className="w-12 h-12 text-purple-400 mx-auto mb-4 animate-spin" />
-                <p className="text-white font-medium mb-2">Processing your document...</p>
-                <p className="text-gray-400">Status: {ocrStatus || 'Initializing'}</p>
+                {(ocrUiState === 'idle' || ocrUiState === 'queued' || ocrUiState === 'processing') && (
+                  <>
+                    <Loader2 className="w-12 h-12 text-purple-400 mx-auto mb-4 animate-spin" />
+                    <p className="text-white font-medium mb-2">Processing your document...</p>
+                  </>
+                )}
+                
+                {ocrUiState === 'done' && (
+                  <>
+                    <CheckCircle2 className="w-12 h-12 text-green-400 mx-auto mb-4" />
+                    <p className="text-white font-medium mb-2">OCR Completed Successfully</p>
+                  </>
+                )}
+                
+                {(ocrUiState === 'failed' || ocrUiState === 'timeout') && (
+                  <>
+                    <AlertCircle className="w-12 h-12 text-amber-400 mx-auto mb-4" />
+                    <p className="text-white font-medium mb-2">
+                      {ocrUiState === 'timeout' ? 'Still Processing' : 'OCR Error'}
+                    </p>
+                  </>
+                )}
+                
+                <p className="text-gray-400 text-sm">Status: {ocrUiState}</p>
+                
+                {ocrError && (
+                  <div className="mt-4 mx-auto max-w-xl bg-white/5 border border-white/10 rounded-lg p-3">
+                    <p className="text-amber-200 text-sm">{ocrError}</p>
+                  </div>
+                )}
               </div>
             </Card>
           )}
 
-          {/* Step 4: Review */}
+          {/* Step 4: Review & Confirm */}
           {step === 4 && (
             <Card className="bg-white/5 backdrop-blur border-white/10 p-8">
-              <h2 className="text-2xl font-bold text-white mb-6">Review OCR Results</h2>
-              {ocrResults && (
-                <div className="space-y-4">
-                  <div>
-                    <h3 className="text-white font-medium mb-2">Preview</h3>
-                    <div className="bg-white/5 border border-white/10 rounded-lg p-4 text-gray-300 text-sm max-h-48 overflow-y-auto">
-                      {ocrResults.preview_text || 'No preview available'}
-                    </div>
-                  </div>
+              <h2 className="text-2xl font-bold text-white mb-2">Review & Confirm</h2>
+              <p className="text-gray-400 text-sm mb-6">
+                You can edit the extracted text below before submitting for admin review.
+              </p>
+              
+              <div className="space-y-4">
+                <div>
+                  <label className="text-white font-medium mb-2 block">Extracted Text</label>
+                  <Textarea
+                    value={reviewText}
+                    onChange={(e) => setReviewText(e.target.value)}
+                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-500 resize-none min-h-[260px]"
+                    placeholder="OCR text will appear here..."
+                  />
                 </div>
-              )}
+              </div>
             </Card>
           )}
 
