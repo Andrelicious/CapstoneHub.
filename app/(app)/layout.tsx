@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation"
 import { cookies } from "next/headers"
 import { createServerClient } from "@supabase/ssr"
+import { UserProvider } from "@/components/user-provider"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 
@@ -27,36 +28,52 @@ export default async function AppLayout({
     },
   )
 
-  // Check authentication
+  // Check authentication once
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) {
     redirect("/login")
   }
 
-  // Get user role from database (no metadata dependency)
-  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  // Single database query for user profile (replaces all getUserProfile calls)
+  const { data: profile, error } = await supabase
+    .from("profiles")
+    .select("role, display_name")
+    .eq("id", user.id)
+    .single()
+
   const userRole = profile?.role || "student"
+  const displayName = profile?.display_name || user.email?.split("@")[0] || "User"
+
+  // Pass user context to all children to eliminate redundant queries
+  const userContext = {
+    userId: user.id,
+    email: user.email || "",
+    role: userRole as 'student' | 'adviser' | 'admin',
+    displayName,
+  }
 
   return (
-    <div className="min-h-screen bg-[#0a0612] flex flex-col">
-      {/* Background effects */}
-      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[#0a0612]" />
-        <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px] animate-pulse" />
-        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[150px] animate-pulse" />
+    <UserProvider user={userContext}>
+      <div className="min-h-screen bg-[#0a0612] flex flex-col">
+        {/* Background effects */}
+        <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+          <div className="absolute inset-0 bg-[#0a0612]" />
+          <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px] animate-pulse" />
+          <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[150px] animate-pulse" />
+        </div>
+
+        {/* Navbar */}
+        <Navbar />
+
+        {/* Main content */}
+        <main className="flex-1">
+          {children}
+        </main>
+
+        {/* Footer */}
+        <Footer />
       </div>
-
-      {/* Navbar */}
-      <Navbar />
-
-      {/* Main content */}
-      <main className="flex-1">
-        {children}
-      </main>
-
-      {/* Footer */}
-      <Footer />
-    </div>
+    </UserProvider>
   )
 }
