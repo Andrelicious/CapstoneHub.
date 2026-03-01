@@ -17,10 +17,10 @@ export async function getDraftDataset(datasetId: string) {
     throw new Error('Not authenticated')
   }
 
-  // Fetch the dataset with selective columns to avoid RLS issues
+  // Fetch the dataset with only valid columns from the schema
   const { data: dataset, error } = await supabase
     .from('datasets')
-    .select('id,title,description,program,doc_type,school_year,category,tags,status,file_path,file_name,user_id')
+    .select('id,title,description,program,doc_type,school_year,category,tags,status,user_id,created_at')
     .eq('id', datasetId)
     .eq('user_id', user.id)
     .single()
@@ -84,7 +84,7 @@ export async function createDatasetDraft(data: {
 }
 
 /**
- * Upload file to storage and update dataset with file path
+ * Upload file to storage for dataset
  */
 export async function uploadDatasetFile(datasetId: string, file: File) {
   try {
@@ -98,7 +98,7 @@ export async function uploadDatasetFile(datasetId: string, file: File) {
       throw new Error('Not authenticated')
     }
 
-    // Upload file to storage
+    // Upload file to storage using dataset versions table
     const fileExt = file.name.split('.').pop()
     const fileName = `${datasetId}-${Date.now()}.${fileExt}`
     const filePath = `datasets/${user.id}/${fileName}`
@@ -111,22 +111,22 @@ export async function uploadDatasetFile(datasetId: string, file: File) {
       throw new Error(`File upload failed: ${uploadError.message}`)
     }
 
-    // Update dataset with file info
-    const { error: updateError } = await supabase
-      .from('datasets')
-      .update({
-        file_path: filePath,
+    // Store file version info
+    const { error: versionError } = await supabase
+      .from('dataset_versions')
+      .insert({
+        dataset_id: datasetId,
         file_name: file.name,
+        file_size: file.size,
+        version_number: 1,
       })
-      .eq('id', datasetId)
-      .eq('user_id', user.id)
 
-    if (updateError) {
-      throw new Error(`Failed to update dataset: ${updateError.message}`)
+    if (versionError) {
+      throw new Error(`Failed to store file version: ${versionError.message}`)
     }
 
     revalidateTag('datasets')
-    return { success: true, filePath }
+    return { success: true, filePath, fileName }
   } catch (error) {
     throw error
   }
@@ -383,7 +383,7 @@ export async function getDatasetById(datasetId: string) {
   // Use selective columns to avoid RLS infinite recursion
   let query = supabase
     .from('datasets')
-    .select('id,title,description,program,doc_type,user_id,school_year,category,tags,status,created_at,file_path,file_name')
+    .select('id,title,description,program,doc_type,user_id,school_year,category,tags,status,created_at,license,admin_remarks')
     .eq('id', datasetId)
 
   // If user is not authenticated, only show approved datasets
