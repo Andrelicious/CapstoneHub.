@@ -40,6 +40,10 @@ export default async function SubmissionDetailPage({ params }: { params: { id: s
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) redirect('/login')
 
+  // Fetch role from database (no metadata dependency)
+  const { data: profile } = await authClient.from('profiles').select('role').eq('id', user.id).single()
+  const userRole = profile?.role || 'student'
+
   const supabaseAdmin = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
@@ -55,9 +59,6 @@ export default async function SubmissionDetailPage({ params }: { params: { id: s
   if (error || !dataset) {
     redirect('/student/dashboard')
   }
-
-  // Check access permissions
-  const userRole = user.user_metadata?.role || 'student'
   const isOwner = dataset.user_id === user.id
   const isAdmin = userRole === 'admin'
   const isApproved = dataset.status === 'approved'

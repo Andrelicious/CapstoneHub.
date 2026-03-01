@@ -34,33 +34,39 @@ export default function Navbar() {
   useEffect(() => {
     const supabase = getSupabaseClient()
 
-    // Check session immediately (sync from storage if available)
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    // Fetch profile from database (no metadata dependency)
+    const fetchProfile = async (userId: string) => {
+      const { data } = await supabase
+        .from('profiles')
+        .select('display_name, email, role, avatar_url')
+        .eq('id', userId)
+        .single()
+      
+      return {
+        display_name: data?.display_name || "User",
+        email: data?.email || null,
+        role: data?.role || "student",
+        avatar_url: data?.avatar_url || null,
+      }
+    }
+
+    // Check session immediately
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        // Set profile from user metadata (avoid RLS issues)
-        setProfile({
-          display_name: session.user.user_metadata?.display_name || session.user.email?.split("@")[0] || "User",
-          email: session.user.email || null,
-          role: session.user.user_metadata?.role || "student",
-          avatar_url: session.user.user_metadata?.avatar_url || null,
-        })
+        const profile = await fetchProfile(session.user.id)
+        setProfile(profile)
       }
     })
 
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
+    } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (session?.user) {
         setUser(session.user)
-        // Use user metadata only (avoid RLS infinite recursion on profiles table)
-        setProfile({
-          display_name: session.user.user_metadata?.display_name || session.user.email?.split("@")[0] || "User",
-          email: session.user.email || null,
-          role: session.user.user_metadata?.role || "student",
-          avatar_url: session.user.user_metadata?.avatar_url || null,
-        })
+        const profile = await fetchProfile(session.user.id)
+        setProfile(profile)
       } else {
         setUser(null)
         setProfile(null)

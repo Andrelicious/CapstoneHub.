@@ -24,16 +24,19 @@ export async function GET(request: Request) {
       const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
 
       if (!profile) {
+        // Extract display name from email (no metadata used)
+        const displayName = data.user.email?.split("@")[0] || "User"
+        
         await supabase.from("profiles").insert({
           id: data.user.id,
           email: data.user.email,
-          display_name:
-            data.user.user_metadata?.full_name || data.user.user_metadata?.name || data.user.email?.split("@")[0],
+          display_name: displayName,
           role: "student",
         })
         return NextResponse.redirect(`${origin}/student/dashboard`)
       }
 
+      // Get role from database (no metadata)
       const role = profile.role || "student"
       if (role === "admin") {
         return NextResponse.redirect(`${origin}/admin/dashboard`)

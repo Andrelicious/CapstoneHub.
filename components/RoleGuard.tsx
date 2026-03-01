@@ -18,37 +18,30 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    const supabase = getSupabaseClient()
-    
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const fetchRole = async () => {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
       if (session?.user) {
-        // Try to get role from metadata first
-        const roleFromMetadata = session.user.user_metadata?.role
-        if (roleFromMetadata) {
-          setRole(roleFromMetadata)
-          setLoading(false)
-          return
-        }
-        
-        // Fallback: fetch from profiles table
-        supabase
+        // Fetch role from profiles table (database only, no metadata)
+        const { data, error } = await supabase
           .from('profiles')
           .select('role')
           .eq('id', session.user.id)
           .single()
-          .then(({ data }) => {
-            setRole(data?.role || 'student')
-            setLoading(false)
-          })
-          .catch(() => {
-            setRole('student')
-            setLoading(false)
-          })
+        
+        if (!error && data) {
+          setRole(data.role || 'student')
+        } else {
+          setRole('student')
+        }
       } else {
         setRole(null)
-        setLoading(false)
       }
-    })
+      setLoading(false)
+    }
+    
+    fetchRole()
   }, [])
 
   if (loading) {

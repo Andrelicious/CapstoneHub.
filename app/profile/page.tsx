@@ -57,19 +57,19 @@ export default function ProfilePage() {
           bio: profileData.bio || "",
         })
       } else {
-        // Create profile from user metadata
+        // Initialize with defaults if profile doesn't exist
         setProfile({
           id: user.id,
-          display_name: user.user_metadata?.display_name || user.email?.split("@")[0] || "",
+          display_name: user.email?.split("@")[0] || "",
           email: user.email || "",
-          role: user.user_metadata?.role || "student",
-          organization: user.user_metadata?.student_id || "",
+          role: "student",
+          organization: "",
           bio: "",
           avatar_url: null,
         })
         setFormData({
-          display_name: user.user_metadata?.display_name || "",
-          organization: user.user_metadata?.student_id || "",
+          display_name: user.email?.split("@")[0] || "",
+          organization: "",
           bio: "",
         })
       }

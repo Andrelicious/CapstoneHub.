@@ -21,21 +21,25 @@ export function StudentProfileMenu() {
   useEffect(() => {
     async function loadProfile() {
       const supabase = getSupabaseClient()
-      const {
-        data: { user },
-      } = await supabase.auth.getUser()
+      const { data: { user } } = await supabase.auth.getUser()
 
       if (!user) {
         setLoading(false)
         return
       }
 
-      // Use user metadata to avoid RLS infinite recursion on profiles table
+      // Fetch profile from database (no metadata dependency)
+      const { data: dbProfile } = await supabase
+        .from('profiles')
+        .select('display_name, email, role')
+        .eq('id', user.id)
+        .single()
+
       setProfile({
         id: user.id,
-        display_name: user.user_metadata?.display_name || user.email?.split("@")[0] || "User",
-        email: user.email || "",
-        role: user.user_metadata?.role || "student",
+        display_name: dbProfile?.display_name || user.email?.split("@")[0] || "User",
+        email: dbProfile?.email || user.email || "",
+        role: dbProfile?.role || "student",
       })
       setLoading(false)
     }

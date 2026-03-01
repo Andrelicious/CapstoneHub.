@@ -46,8 +46,9 @@ async function getSubmissionData(id: string) {
     return { redirect: '/login' }
   }
 
-  // Get role from user metadata (already loaded, no fetch needed)
-  const userRole = user.user_metadata?.role || "student"
+  // Fetch role from database (no metadata dependency)
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const userRole = profile?.role || "student"
   
   // RBAC: Only admins can access review pages
   if (userRole !== 'admin') {

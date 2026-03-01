@@ -45,11 +45,9 @@ export async function checkRBACAccess(allowedRoles: string[]): Promise<RBACCheck
     }
   }
 
-  // Get role from user metadata (preferred) or from profile as fallback
-  const userRole = user.user_metadata?.role || 'student'
-  
-  // Optional: Verify role from profiles table if needed (uses selective columns to avoid RLS issues)
-  // const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  // Get role from database (no metadata dependency)
+  const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single()
+  const userRole = profile?.role || 'student'
 
   // Check if user has access
   const hasAccess = allowedRoles.includes(userRole)

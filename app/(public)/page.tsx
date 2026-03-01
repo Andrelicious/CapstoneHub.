@@ -9,10 +9,17 @@ import { Zap, BookOpen, CheckCircle2 } from "lucide-react"
 export default function Home() {
   // Check if already logged in and redirect to dashboard
   useEffect(() => {
-    const supabase = getSupabaseClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkAndRedirect = async () => {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
-        const role = session.user.user_metadata?.role || "student"
+        // Fetch role from database (no metadata dependency)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        const role = profile?.role || "student"
         if (role === "admin") {
           window.location.href = "/admin/dashboard"
         } else if (role === "adviser") {
@@ -21,7 +28,8 @@ export default function Home() {
           window.location.href = "/student/dashboard"
         }
       }
-    })
+    }
+    checkAndRedirect()
   }, [])
 
   return (

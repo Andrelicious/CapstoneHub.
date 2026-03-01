@@ -18,12 +18,15 @@ export default function HeroSection() {
   useEffect(() => {
     const checkUserRole = async () => {
       const supabase = getSupabaseClient()
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
+      const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
-        // Use user metadata to avoid RLS recursion issues
-        setUserRole(session.user.user_metadata?.role || "student")
+        // Fetch role from database (no metadata dependency)
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', session.user.id)
+          .single()
+        setUserRole(profile?.role || "student")
       }
     }
     checkUserRole()

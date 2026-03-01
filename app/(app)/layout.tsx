@@ -34,8 +34,9 @@ export default async function AppLayout({
     redirect("/login")
   }
 
-  // Get user role from metadata (already loaded, no fetch needed)
-  const userRole = user.user_metadata?.role || "student"
+  // Get user role from database (no metadata dependency)
+  const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+  const userRole = profile?.role || "student"
 
   return (
     <div className="min-h-screen bg-[#0a0612] flex flex-col">

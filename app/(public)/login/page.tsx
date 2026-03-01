@@ -20,10 +20,13 @@ export default function LoginPage() {
 
   // Check if already logged in and redirect to dashboard
   useEffect(() => {
-    const supabase = getSupabaseClient()
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    const checkAndRedirect = async () => {
+      const supabase = getSupabaseClient()
+      const { data: { session } } = await supabase.auth.getSession()
       if (session?.user) {
-        const role = session.user.user_metadata?.role || "student"
+        // Fetch role from database instead of metadata
+        const { data: profile } = await supabase.from("profiles").select("role").eq("id", session.user.id).single()
+        const role = profile?.role || "student"
         if (role === "admin") {
           window.location.href = "/admin/dashboard"
         } else if (role === "adviser") {
@@ -32,7 +35,8 @@ export default function LoginPage() {
           window.location.href = "/student/dashboard"
         }
       }
-    })
+    }
+    checkAndRedirect()
   }, [])
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -56,8 +60,9 @@ export default function LoginPage() {
     }
 
     if (data.session) {
-      // Use user metadata to avoid RLS infinite recursion
-      const role = data.user.user_metadata?.role || "student"
+      // Fetch role from database instead of metadata
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
+      const role = profile?.role || "student"
 
       if (role === "admin") {
         window.location.href = "/admin/dashboard"
