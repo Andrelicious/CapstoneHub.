@@ -5,6 +5,7 @@ import { createClient } from "@supabase/supabase-js"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import { getUserProfile } from "@/lib/auth-actions"
 import { Eye, BookOpen, CheckCircle2, TrendingUp } from "lucide-react"
 
 const statusConfig = {
@@ -33,8 +34,9 @@ export default async function AdviserDashboardPage() {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) redirect('/login')
 
-  const userRole = user.user_metadata?.role || "student"
-  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Adviser'
+  const userProfile = await getUserProfile()
+  const userRole = userProfile?.role || "student"
+  const displayName = userProfile?.displayName || 'Adviser'
   
   if (userRole === "student") {
     redirect("/student/dashboard")

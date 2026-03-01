@@ -52,21 +52,17 @@ export function DatasetSubmissionWizard() {
   const [datasetId, setDatasetId] = useState<string>('')
   const [ocrStatus, setOcrStatus] = useState('')
   const [ocrResults, setOcrResults] = useState<any>(null)
-  const [isInitializing, setIsInitializing] = useState(true)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
 
-  // Load draft data if URL contains draft parameter
+  // Load draft data only once on mount
   useEffect(() => {
     let isMounted = true
 
     const loadDraft = async () => {
       const draftId = searchParams.get('draft')
-      if (!draftId) {
-        if (isMounted) setIsInitializing(false)
-        return
-      }
+      if (!draftId) return
 
       try {
         const draft = await getDraftDataset(draftId)
@@ -84,18 +80,13 @@ export function DatasetSubmissionWizard() {
           category: draft.category || '',
           tags: Array.isArray(draft.tags) ? draft.tags.join(', ') : '',
         })
-
-        // Determine which step to show based on draft status
-        let nextStep: WizardStep = 1
-        setStep(nextStep)
       } catch (error: any) {
         if (isMounted) {
           toast({
             title: 'Error loading draft',
-            description: 'Please try again or create a new submission',
+            description: 'Starting fresh submission instead',
             variant: 'destructive',
           })
-          setIsInitializing(false)
         }
       }
     }
@@ -104,21 +95,7 @@ export function DatasetSubmissionWizard() {
     return () => {
       isMounted = false
     }
-  }, [searchParams])
-
-  // Show loading state while initializing
-  if (isInitializing) {
-    return (
-      <div className="min-h-screen bg-[#0a0612] flex items-center justify-center">
-        <Card className="p-8">
-          <div className="flex items-center gap-3">
-            <Loader2 className="w-6 h-6 animate-spin" />
-            <p className="text-lg">Loading draft...</p>
-          </div>
-        </Card>
-      </div>
-    )
-  }
+  }, [])
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target

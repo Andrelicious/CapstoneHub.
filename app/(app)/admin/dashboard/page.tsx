@@ -6,6 +6,7 @@ import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card } from "@/components/ui/card"
+import { getUserProfile } from "@/lib/auth-actions"
 import { ClipboardCheck, Eye, Clock, AlertCircle, CheckCircle2, XCircle, Shield } from "lucide-react"
 
 const statusConfig = {
@@ -39,8 +40,9 @@ export default async function AdminDashboardPage() {
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) redirect('/login')
 
-  const userRole = user.user_metadata?.role || "student"
-  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Admin'
+  const userProfile = await getUserProfile()
+  const userRole = userProfile?.role || "student"
+  const displayName = userProfile?.displayName || 'Admin'
   
   if (userRole !== "admin") {
     if (userRole === "adviser") return redirect("/adviser/dashboard")

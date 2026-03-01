@@ -5,6 +5,7 @@ import { createClient } from '@supabase/supabase-js'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { getUserProfile } from '@/lib/auth-actions'
 import { Upload, BookOpen, Clock, CheckCircle2, XCircle, Eye, FileText, Calendar, ArrowRight, GraduationCap } from 'lucide-react'
 
 const statusConfig = {
@@ -37,13 +38,14 @@ export default async function StudentDashboardPage() {
     },
   )
 
-  // Check authentication & role
+  // Check authentication
   const { data: { user } } = await authClient.auth.getUser()
   if (!user) redirect('/login')
 
-  // Get profile data from user metadata (already loaded, no RLS issues)
-  const userRole = user.user_metadata?.role || 'student'
-  const displayName = user.user_metadata?.display_name || user.email?.split('@')[0] || 'Student'
+  // Get role and display name from database (no metadata)
+  const userProfile = await getUserProfile()
+  const userRole = userProfile?.role || 'student'
+  const displayName = userProfile?.displayName || 'Student'
 
   // RBAC: Only students can access this page
   if (userRole !== 'student') {

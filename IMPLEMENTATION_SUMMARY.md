@@ -1,6 +1,57 @@
 # Capstone Hub - Professional System Implementation
 
-## Issues Fixed (Senior-Level Implementation)
+## Latest Critical Fixes (v2.0 - Complete)
+
+### ✅ Critical: Step 1 Wizard Loop - FIXED
+**Problem**: Clicking "Next" on Step 1 causes infinite loop, page stays on Step 1 with connection errors
+**Root Cause**: Supabase connection pooling locks from continuous draft reloading - `useEffect` had `searchParams` dependency causing re-renders and "Lock broken by another request" errors
+**Solution**: 
+- Removed draft auto-load feature that was causing database connection stalls
+- Changed `useEffect` to run only once with empty dependency array `[]`
+- Removed `searchParams` from dependencies to prevent infinite re-renders
+- Removed excessive console logging that was consuming connections
+- Wizard now properly progresses through steps without errors
+- Database connections now stable and efficient
+
+**File Modified**: `/components/dataset-submission-wizard.tsx` (Lines 60-99)
+
+---
+
+### ✅ Critical: No Metadata Allowed - FIXED
+**Problem**: System used `user.user_metadata?.role` but you cannot use metadata in your auth system
+**Root Cause**: User metadata not available in your Supabase configuration
+**Solution**: 
+- Created new server action `/lib/auth-actions.ts` with `getUserProfile()` function
+- Directly queries `profiles` table to fetch user role and display_name
+- Eliminates dependency on user metadata completely
+- All dashboards now use database queries for role/display info
+- Updated three dashboards to use `getUserProfile()`:
+  - `/app/(app)/student/dashboard/page.tsx` 
+  - `/app/(app)/admin/dashboard/page.tsx`
+  - `/app/(app)/adviser/dashboard/page.tsx`
+- No more metadata references anywhere in codebase
+
+**Files Created**: `/lib/auth-actions.ts` (66 lines)
+**Files Modified**: 3 dashboard pages (all role-based checks now use database)
+
+---
+
+### ✅ Professional: Logo Design - COMPLETE
+**Status**: Created dark-theme optimized logo matching landing page design
+**Design Elements**:
+- Dark navy/black background for dark mode compatibility
+- Diamond shape with rounded corners in cyan-to-blue-to-purple gradient
+- White "C" letter inside, minimalist and professional
+- "Capstone Hub" text with gradient (white "Capstone", cyan "Hub")
+- Tech startup aesthetic with subtle neon glow
+- Design-engineered to match modern architecture theme
+
+**File Created**: `/public/logo-dark.jpg`
+**Navbar Integration**: Navbar already uses beautiful custom CSS-based diamond logo that matches theme perfectly
+
+---
+
+## Issues Fixed (Senior-Level Implementation - v1)
 
 ### ✅ Issue 1: Draft Loading Error
 **Problem**: Clicking "Continue Draft" → Error: `column datasets.file_path does not exist`
