@@ -1,0 +1,114 @@
+import { cookies } from 'next/headers'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { AdminReviewPage } from '@/components/admin-review-page'
+
+interface Submission {
+  id: string
+  title: string
+  program: string
+  category: string
+  authors?: string[]
+  author_name?: string
+  created_at: string
+  status: string
+  abstract?: string
+  [key: string]: unknown
+}
+
+async function getSubmissionData(id: string) {
+  const cookieStore = await cookies()
+  const supabase = await createSupabaseServerClient()
+
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser()
+
+  if (authError || !user) {
+    return { redirect: '/login' }
+  }
+
+  // Fetch admin profile using service role API to avoid RLS infinite recursion
+  let adminProfile = null
+  try {
+    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
+      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
+    })
+    if (profileRes.ok) {
+      const { profile: p } = await profileRes.json()
+      adminProfile = p
+    }
+  } catch (e) {
+    console.error('Failed to fetch profile:', e)
+  }
+
+  // RBAC: Only admins can access review pages
+  if (adminProfile?.role !== 'admin') {
+    if (adminProfile?.role === 'adviser') return { redirect: '/adviser/dashboard' }
+    return { redirect: '/student/dashboard' }
+  }
+
+  const { data: dataset } = await supabase
+    .from('datasets')
+    .select('*')
+    .eq('id', id)
+    .single()
+
+  if (!dataset) {
+    return { redirect: '/admin/dashboard', notFound: true }
+  }
+
+  // Fetch student profile and OCR results using service role to avoid RLS
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const dataSupabase = serviceRoleKey
+    ? await createSupabaseServerClient({ supabaseKey: serviceRoleKey })
+    : supabase
+
+  const { data: studentProfile } = await dataSupabase.from('profiles').select('display_name').eq('id', dataset.user_id).single()
+
+  const { data: ocrResults } = await dataSupabase.from('ocr_results').select('*').eq('dataset_id', id).single()
+
+  // Transform dataset to submission format
+  const transformedSubmission = {
+    id: dataset.id,
+    title: dataset.title || '',
+    program: dataset.program || 'General',
+    document_type: dataset.doc_type || 'Capstone Project',
+    student_id: dataset.user_id || '',
+    student_name: studentProfile?.display_name || 'Unknown',
+    submitted_date: dataset.created_at,
+    status: dataset.status as 'pending_admin_review',
+    preview_text: ocrResults?.preview_text || dataset.description || 'No OCR preview available',
+    full_ocr_text: ocrResults?.full_text || 'No OCR text extracted yet',
+    quality_flags: ocrResults?.quality_flags ? Object.keys(ocrResults.quality_flags) : [],
+    file_url: dataset.file_path ? `/storage/download/${dataset.file_path}` : undefined,
+  }
+
+  return { submission: transformedSubmission }
+}
+
+export default async function AdminReviewRoute({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
+  const data = await getSubmissionData(id)
+
+  if ('redirect' in data) {
+    redirect(data.redirect)
+  }
+
+  if ('notFound' in data && data.notFound) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-3xl font-bold text-white mb-2">Submission Not Found</h1>
+          <p className="text-muted-foreground mb-6">The submission you're looking for doesn't exist.</p>
+          <a href="/admin/dashboard" className="text-purple-400 hover:text-purple-300">
+            Back to Dashboard
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  return <AdminReviewPage submission={data.submission} />
+}
