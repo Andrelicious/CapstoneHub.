@@ -3,7 +3,8 @@
 import React from "react"
 
 import { useState, useEffect } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
+import { useStableRouter } from '@/hooks/use-stable-router'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -58,7 +59,7 @@ export function DatasetSubmissionWizard() {
   const [ocrError, setOcrError] = useState<string>('')
   const [reviewText, setReviewText] = useState<string>('')
   const [ocrResults, setOcrResults] = useState<any>(null)
-  const router = useRouter()
+  const router = useStableRouter() // ✅ Use stable router (prevents freezing)
   const searchParams = useSearchParams()
   const { toast } = useToast()
 
@@ -311,12 +312,6 @@ export function DatasetSubmissionWizard() {
         setLoading(false)
       }
     }
-          title: 'Error',
-          description: error.message,
-          variant: 'destructive',
-        })
-      } finally {
-        setLoading(false)
       }
     }
   }

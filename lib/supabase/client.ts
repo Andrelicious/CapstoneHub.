@@ -1,33 +1,36 @@
 import { createBrowserClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-// Singleton browser client instance
-let supabaseClient: SupabaseClient | null = null
+// HMR-safe singleton: survives hot reload without creating duplicate GoTrueClient instances
+declare global {
+  var __supabaseBrowserClient: SupabaseClient | undefined
+}
 
 /**
  * Get or create a singleton Supabase browser client instance.
- * This ensures only ONE GoTrueClient instance exists in the browser context.
+ * Uses globalThis to survive HMR reloads - critical for demo stability.
+ * Prevents "Multiple GoTrueClient instances" warning.
  */
 export function createClient() {
-  if (supabaseClient) {
-    return supabaseClient
+  if (globalThis.__supabaseBrowserClient) {
+    return globalThis.__supabaseBrowserClient
   }
 
-  supabaseClient = createBrowserClient(
+  globalThis.__supabaseBrowserClient = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  return supabaseClient
+  return globalThis.__supabaseBrowserClient
 }
 
 /**
  * Get the existing Supabase client (already created).
- * Safer than createClient() for use in multiple places.
+ * Safe for use in multiple places - returns singleton instance.
  */
 export function getSupabaseClient() {
-  if (!supabaseClient) {
+  if (!globalThis.__supabaseBrowserClient) {
     return createClient()
   }
-  return supabaseClient
+  return globalThis.__supabaseBrowserClient
 }
