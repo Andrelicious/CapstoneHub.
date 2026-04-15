@@ -91,8 +91,9 @@ export default function ResetPasswordPage() {
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <Lock className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Reset Password</h1>
-            <p className="text-sm text-muted-foreground">Enter your new password below</p>
+            <p className="text-xs font-semibold tracking-[0.2em] text-cyan-500 uppercase mb-2">Security Update</p>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Set a New Password</h1>
+            <p className="text-sm text-muted-foreground">Create a strong password to secure your workspace.</p>
           </div>
 
           {/* Message Alert */}
@@ -149,7 +150,7 @@ export default function ResetPasswordPage() {
               </div>
 
               <Button type="submit" disabled={loading} className="w-full h-12 text-base">
-                {loading ? "Updating..." : "Update Password"}
+                {loading ? "Updating security..." : "Update Security Credentials"}
               </Button>
             </form>
           )}
@@ -161,7 +162,7 @@ export default function ResetPasswordPage() {
                 href="/forgot-password"
                 className="inline-flex items-center gap-2 text-sm text-primary hover:underline"
               >
-                Request a new reset link
+                Request another secure link
               </a>
             </div>
           )}

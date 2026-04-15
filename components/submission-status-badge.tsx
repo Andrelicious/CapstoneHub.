@@ -2,10 +2,10 @@
 
 import React from "react"
 
-import { Clock, AlertCircle, CheckCircle, XCircle, RotateCcw } from 'lucide-react'
+import { Clock, AlertCircle, CheckCircle, XCircle } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 
-export type SubmissionStatus = 'draft' | 'ocr_processing' | 'pending_admin_review' | 'returned' | 'approved' | 'rejected'
+export type SubmissionStatus = 'draft' | 'ocr_processing' | 'pending_admin_review' | 'approved' | 'rejected'
 
 interface SubmissionStatusBadgeProps {
   status: SubmissionStatus
@@ -26,13 +26,8 @@ export function SubmissionStatusBadge({ status, className = '' }: SubmissionStat
     },
     pending_admin_review: {
       icon: Clock,
-      label: 'Pending Review',
+      label: 'Pending Admin Review',
       color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
-    },
-    returned: {
-      icon: RotateCcw,
-      label: 'Returned',
-      color: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
     },
     approved: {
       icon: CheckCircle,

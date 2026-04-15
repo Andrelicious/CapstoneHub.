@@ -23,6 +23,31 @@ interface DatasetRow {
   status: string | null
 }
 
+interface OcrTitleRow {
+  dataset_id?: string | null
+  submission_id?: string | null
+  title?: string | null
+  title_hint?: string | null
+}
+
+function hasMissingColumnError(message: string, column: string) {
+  const normalized = (message || '').toLowerCase()
+  return (
+    normalized.includes(`could not find the '${column}' column`) ||
+    normalized.includes(`column "${column}" does not exist`) ||
+    normalized.includes(`column ${column} does not exist`) ||
+    normalized.includes(`column ocr_results.${column} does not exist`)
+  )
+}
+
+function isMissingTableError(message: string, table: string) {
+  const normalized = (message || '').toLowerCase()
+  return (
+    normalized.includes(`relation "${table}" does not exist`) ||
+    normalized.includes(`could not find the table '${table}'`)
+  )
+}
+
 export default async function AdminReviewPage() {
   const supabase = await createSupabaseServerClient()
 
@@ -34,8 +59,7 @@ export default async function AdminReviewPage() {
     redirect('/login')
   }
 
-  const metadataRole = typeof user.user_metadata?.role === 'string' ? user.user_metadata.role.toLowerCase() : 'student'
-  let role = metadataRole
+  let role = 'student'
 
   try {
     const profileLookupClient = await createSupabaseServerClient({
@@ -51,9 +75,7 @@ export default async function AdminReviewPage() {
     if (typeof profile?.role === 'string') {
       role = profile.role.toLowerCase()
     }
-  } catch {
-    // fallback to metadata role
-  }
+  } catch {}
 
   if (role !== 'admin') {
     if (role === 'adviser') redirect('/adviser/dashboard')
@@ -85,9 +107,49 @@ export default async function AdminReviewPage() {
   }
 
   const pendingStatuses = new Set(['pending_admin_review', 'pending', 'pending_review', 'for_review', 'ocr_processing'])
-  const reviewedStatuses = new Set(['approved', 'rejected', 'returned'])
+  const reviewedStatuses = new Set(['approved', 'rejected'])
   const visibleStatuses = new Set([...pendingStatuses, ...reviewedStatuses])
   const visibleDatasets = datasets.filter((dataset) => visibleStatuses.has((dataset.status || '').toLowerCase()))
+  const datasetIds = visibleDatasets.map((dataset) => dataset.id)
+
+  let ocrTitleMap: Record<string, OcrTitleRow> = {}
+  if (datasetIds.length > 0) {
+    let ocrRead = await serviceClient
+      .from('ocr_results')
+      .select('dataset_id, title, title_hint')
+      .in('dataset_id', datasetIds)
+
+    if (ocrRead.error && hasMissingColumnError(ocrRead.error.message || '', 'title')) {
+      ocrRead = await serviceClient
+        .from('ocr_results')
+        .select('dataset_id, title_hint')
+        .in('dataset_id', datasetIds)
+    }
+
+    if (ocrRead.error && hasMissingColumnError(ocrRead.error.message || '', 'dataset_id')) {
+      ocrRead = await serviceClient
+        .from('ocr_results')
+        .select('submission_id, title, title_hint')
+        .in('submission_id', datasetIds)
+
+      if (ocrRead.error && hasMissingColumnError(ocrRead.error.message || '', 'title')) {
+        ocrRead = await serviceClient
+          .from('ocr_results')
+          .select('submission_id, title_hint')
+          .in('submission_id', datasetIds)
+      }
+    }
+
+    if (!ocrRead.error) {
+      ocrTitleMap = Object.fromEntries(
+        ((ocrRead.data || []) as OcrTitleRow[])
+          .map((row) => [row.dataset_id || row.submission_id || '', row])
+          .filter(([id]) => Boolean(id))
+      )
+    } else if (!isMissingTableError(ocrRead.error.message || '', 'ocr_results')) {
+      throw new Error(`Failed to load OCR titles for admin queue: ${ocrRead.error.message}`)
+    }
+  }
 
   const userIds = Array.from(new Set(visibleDatasets.map((dataset) => dataset.user_id).filter(Boolean)))
 
@@ -105,13 +167,15 @@ export default async function AdminReviewPage() {
     if (value === 'ocr_processing') return 'ocr_processing'
     if (value === 'approved') return 'approved'
     if (value === 'rejected') return 'rejected'
-    if (value === 'returned') return 'returned'
     return 'pending_admin_review'
   }
 
   const submissions: ReviewSubmission[] = visibleDatasets.map((dataset) => ({
     id: dataset.id,
-    title: dataset.title || 'Untitled Submission',
+    title:
+      (ocrTitleMap[dataset.id]?.title || ocrTitleMap[dataset.id]?.title_hint || '').trim() ||
+      (dataset.title || '').trim() ||
+      'Untitled Submission',
     program: dataset.program || 'General',
     student_name: profileMap[dataset.user_id] || 'Unknown Student',
     submitted_date: dataset.created_at,
@@ -119,14 +183,14 @@ export default async function AdminReviewPage() {
   }))
 
   return (
-    <div className="min-h-screen bg-[#0a0612]">
+    <div className="min-h-screen bg-background">
       <Navbar />
-      <main className="flex-1 py-12 px-4 sm:px-6 lg:px-8">
+      <main className="flex-1 pt-28 pb-12 px-4 sm:px-6 lg:px-8">
         <div className="max-w-7xl mx-auto">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Admin Review Queue</h1>
-            <p className="text-gray-400">
-              Review pending submissions and track approved, returned, and rejected decisions.
+            <h1 className="text-4xl font-bold text-foreground mb-2">Admin Review Queue</h1>
+            <p className="text-muted-foreground">
+              Review submissions pending admin review and track approved and rejected decisions.
             </p>
           </div>
 

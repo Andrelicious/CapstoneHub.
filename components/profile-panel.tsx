@@ -38,7 +38,7 @@ interface PendingItem {
   title: string
   status: string
   created_at: string
-  uploader_id: string
+  user_id: string
 }
 
 export default function ProfilePanel({ isOpen, onClose, user, profile }: ProfilePanelProps) {
@@ -62,20 +62,28 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
       setLoadingPending(true)
       try {
         const supabase = supabaseBrowser()
-        const { data, error } = await supabase
-          .from("capstones")
-          .select("id, title, status, created_at, uploader_id")
+        const isAdmin = profile?.role === "admin"
+        const isAdviser = profile?.role === "adviser"
+        let query = supabase
+          .from("datasets")
+          .select("id, title, status, created_at, user_id")
           .order("created_at", { ascending: false })
           .limit(10)
+
+        if (isAdmin) {
+          query = query.eq("status", "pending_admin_review")
+        } else if (isAdviser) {
+          query = query.eq("status", "approved")
+        } else {
+          query = query.eq("user_id", user.id)
+        }
+
+        const { data, error } = await query
 
         if (!cancelled) {
           clearTimeout(timeoutId)
           if (!error && data) {
-            if (profile?.role === "admin" || profile?.role === "adviser") {
-              setPendingItems(data.filter((c) => c.status === "pending").slice(0, 5))
-            } else {
-              setPendingItems(data.filter((c) => c.uploader_id === user.id).slice(0, 5))
-            }
+            setPendingItems(data.slice(0, 5))
           } else {
             setPendingItems([])
           }
@@ -157,7 +165,15 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
 
   const handleItemClick = (item: PendingItem) => {
     onClose()
-    window.location.href = `/capstones/${item.id}`
+    if (profile?.role === "admin") {
+      window.location.href = `/admin/review/${item.id}`
+      return
+    }
+    if (profile?.role === "adviser") {
+      window.location.href = `/capstones/${item.id}`
+      return
+    }
+    window.location.href = `/submissions/${item.id}`
   }
 
   const getStatusIcon = (status: string) => {
@@ -167,6 +183,8 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
       case "rejected":
         return XCircle
       case "pending":
+        return Clock
+      case "pending_admin_review":
         return Clock
       default:
         return FileText
@@ -181,9 +199,17 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
         return "bg-red-500/20 text-red-400"
       case "pending":
         return "bg-yellow-500/20 text-yellow-400"
+      case "pending_admin_review":
+        return "bg-yellow-500/20 text-yellow-400"
       default:
         return "bg-purple-500/20 text-purple-400"
     }
+  }
+
+  const getPendingViewAllUrl = () => {
+    if (profile?.role === "admin") return "/admin/review"
+    if (profile?.role === "adviser") return "/browse"
+    return "/student/dashboard#my-submissions"
   }
 
   const formatTimeAgo = (dateString: string) => {
@@ -204,25 +230,25 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
     {
       icon: LayoutDashboard,
       label: "Your Work",
-      description: "View your dashboard",
+      description: "Open your workspace",
       onClick: () => handleNavigation(getDashboardUrl()),
     },
     {
       icon: User,
       label: "Your Profile",
-      description: "Manage your profile",
+      description: "Update identity details",
       onClick: () => handleNavigation("/profile"),
     },
     {
       icon: Users,
       label: "Your Groups",
-      description: "View your groups",
+      description: "Manage research teams",
       onClick: () => handleNavigation("/groups"),
     },
     {
       icon: Settings,
       label: "Settings",
-      description: "Account settings",
+      description: "Control preferences and security",
       onClick: () => handleNavigation("/settings"),
     },
   ]
@@ -235,18 +261,18 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
 
       <div
         ref={panelRef}
-        className="fixed right-0 top-0 h-full w-full max-w-sm bg-[#1a1625] border-l border-white/10 z-50 shadow-2xl 
+        className="fixed right-0 top-0 h-full w-full max-w-sm bg-card border-l border-border z-50 shadow-2xl 
                    transform transition-transform duration-300 ease-out overflow-hidden flex flex-col"
         style={{ transform: isOpen ? "translateX(0)" : "translateX(100%)" }}
       >
-        <div className="p-6 border-b border-white/10">
+        <div className="p-6 border-b border-border">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-lg font-semibold text-white">Account</h2>
+            <h2 className="text-lg font-semibold text-foreground">Account Center</h2>
             <Button
               variant="ghost"
               size="icon"
               onClick={onClose}
-              className="text-gray-400 hover:text-white hover:bg-white/10"
+              className="text-muted-foreground hover:text-foreground hover:bg-accent"
             >
               <X className="w-5 h-5" />
             </Button>
@@ -265,8 +291,8 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
               )}
             </div>
             <div className="flex-1 min-w-0">
-              <h3 className="font-semibold text-white truncate">{profile?.display_name || "User"}</h3>
-              <p className="text-sm text-gray-400 truncate">{user?.email}</p>
+              <h3 className="font-semibold text-foreground truncate">{profile?.display_name || "User"}</h3>
+              <p className="text-sm text-muted-foreground truncate">{user?.email}</p>
               <span className="inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 capitalize">
                 {profile?.role || "Student"}
               </span>
@@ -280,7 +306,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
               <button
                 key={item.label}
                 onClick={item.onClick}
-                className="w-full flex items-center gap-4 px-4 py-3 rounded-lg text-gray-300 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+                className="w-full flex items-center gap-4 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-accent transition-all duration-200 group"
               >
                 <item.icon className="w-5 h-5 text-gray-400 group-hover:text-purple-400 transition-colors" />
                 <div className="text-left">
@@ -291,21 +317,25 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
             ))}
           </div>
 
-          <div className="border-t border-white/10 my-2" />
+          <div className="border-t border-border my-2" />
 
           <div className="p-4">
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2 text-gray-400">
                 <Bell className="w-4 h-4" />
                 <span className="text-sm font-medium">
-                  {profile?.role === "admin" || profile?.role === "adviser" ? "Pending Reviews" : "Your Submissions"}
+                  {profile?.role === "admin"
+                    ? "Review Queue"
+                    : profile?.role === "adviser"
+                      ? "Repository Releases"
+                      : "Submission Pipeline"}
                 </span>
               </div>
               <button
-                onClick={() => handleNavigation(getDashboardUrl())}
+                onClick={() => handleNavigation(getPendingViewAllUrl())}
                 className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
               >
-                View all
+                Open center
               </button>
             </div>
 
@@ -316,9 +346,11 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
                 </div>
               ) : pendingItems.length === 0 ? (
                 <div className="text-center py-4 text-gray-500 text-sm">
-                  {profile?.role === "admin" || profile?.role === "adviser"
-                    ? "No pending submissions"
-                    : "No submissions yet"}
+                  {profile?.role === "admin"
+                    ? "No submissions pending admin review"
+                    : profile?.role === "adviser"
+                      ? "No new repository releases yet"
+                      : "No submissions in your pipeline yet"}
                 </div>
               ) : (
                 pendingItems.map((item) => {
@@ -327,14 +359,14 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
                     <button
                       key={item.id}
                       onClick={() => handleItemClick(item)}
-                      className="w-full flex items-start gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-all duration-200 text-left group"
+                      className="w-full flex items-start gap-3 p-3 rounded-lg bg-accent/40 hover:bg-accent transition-all duration-200 text-left group"
                     >
                       <div className={`p-2 rounded-full ${getStatusColor(item.status)}`}>
                         <Icon className="w-4 h-4" />
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-white truncate">{item.title}</p>
-                        <p className="text-xs text-gray-500 capitalize">{item.status}</p>
+                        <p className="text-sm font-medium text-foreground truncate">{item.title}</p>
+                        <p className="text-xs text-gray-500 capitalize">{item.status.replace(/_/g, " ")}</p>
                         <p className="text-xs text-gray-600 mt-1">{formatTimeAgo(item.created_at)}</p>
                       </div>
                     </button>
@@ -345,7 +377,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
           </div>
         </div>
 
-        <div className="p-4 border-t border-white/10">
+        <div className="p-4 border-t border-border">
           <Button
             variant="ghost"
             onClick={handleSignOut}
@@ -353,7 +385,7 @@ export default function ProfilePanel({ isOpen, onClose, user, profile }: Profile
             className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-500/10"
           >
             {signingOut ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogOut className="w-5 h-5" />}
-            {signingOut ? "Signing out..." : "Sign Out"}
+            {signingOut ? "Signing out..." : "Sign Out Securely"}
           </Button>
         </div>
       </div>

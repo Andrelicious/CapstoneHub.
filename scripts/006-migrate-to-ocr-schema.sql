@@ -10,7 +10,6 @@ CREATE TYPE submission_status_enum AS ENUM (
   'draft',
   'ocr_processing',
   'pending_admin_review',
-  'returned',
   'approved',
   'rejected',
   'archived'
@@ -80,6 +79,10 @@ CREATE TABLE IF NOT EXISTS ocr_results (
   submission_id UUID PRIMARY KEY REFERENCES submissions(id) ON DELETE CASCADE,
   preview_text TEXT,
   full_text TEXT,
+  title_hint TEXT,
+  abstract_text TEXT,
+  references_text TEXT,
+  keywords JSONB DEFAULT '[]'::jsonb,
   confidence NUMERIC(3,2),
   quality_flags JSONB DEFAULT '{}',
   page_count INTEGER,
@@ -167,6 +170,32 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER ocr_results_full_text_search BEFORE INSERT OR UPDATE ON ocr_results
   FOR EACH ROW EXECUTE FUNCTION update_ocr_full_text_search();
 
+CREATE OR REPLACE FUNCTION normalize_ocr_keywords(input_keywords JSONB)
+RETURNS JSONB AS $$
+BEGIN
+  IF input_keywords IS NULL THEN
+    RETURN '[]'::jsonb;
+  END IF;
+
+  IF jsonb_typeof(input_keywords) = 'array' THEN
+    RETURN input_keywords;
+  END IF;
+
+  RETURN '[]'::jsonb;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE FUNCTION update_ocr_keywords_defaults()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.keywords = normalize_ocr_keywords(NEW.keywords);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER ocr_results_keywords_default BEFORE INSERT OR UPDATE ON ocr_results
+  FOR EACH ROW EXECUTE FUNCTION update_ocr_keywords_defaults();
+
 -- ============================================================================
 -- 6. ENABLE RLS ON ALL TABLES
 -- ============================================================================
@@ -207,7 +236,7 @@ CREATE POLICY profiles_adviser_read ON profiles
   );
 
 -- ===== SUBMISSIONS RLS =====
--- Students: can create own submissions, read own (any status), update own (only draft/returned)
+-- Students: can create own submissions, read own (any status), update own (only draft)
 CREATE POLICY submissions_student_create ON submissions
   FOR INSERT WITH CHECK (
     auth.uid() = uploader_id AND
@@ -223,7 +252,7 @@ CREATE POLICY submissions_student_read ON submissions
 CREATE POLICY submissions_student_update ON submissions
   FOR UPDATE USING (
     auth.uid() = uploader_id AND
-    status IN ('draft', 'returned') AND
+    status IN ('draft') AND
     (SELECT role FROM profiles WHERE id = auth.uid()) = 'student'
   );
 
@@ -256,7 +285,7 @@ CREATE POLICY submission_files_student_insert ON submission_files
     submission_id IN (
       SELECT id FROM submissions
       WHERE uploader_id = auth.uid() AND
-            status IN ('draft', 'returned') AND
+            status IN ('draft') AND
             (SELECT role FROM profiles WHERE id = auth.uid()) = 'student'
     )
   );

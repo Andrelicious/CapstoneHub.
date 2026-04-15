@@ -3,14 +3,25 @@
 import { createBrowserClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
 
-let supabaseBrowserSingleton: SupabaseClient | null = null
+let persistentBrowserClientSingleton: SupabaseClient | null = null
+let sessionBrowserClientSingleton: SupabaseClient | null = null
+
+type SupabaseBrowserOptions = {
+  rememberSession?: boolean
+}
 
 /**
  * Get or create a singleton Supabase browser client.
  */
-function getSupabaseBrowser(): SupabaseClient {
-  if (supabaseBrowserSingleton) {
-    return supabaseBrowserSingleton
+function getSupabaseBrowser(options: SupabaseBrowserOptions = {}): SupabaseClient {
+  const rememberSession = options.rememberSession !== false
+
+  if (rememberSession && persistentBrowserClientSingleton) {
+    return persistentBrowserClientSingleton
+  }
+
+  if (!rememberSession && sessionBrowserClientSingleton) {
+    return sessionBrowserClientSingleton
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -22,12 +33,24 @@ function getSupabaseBrowser(): SupabaseClient {
     )
   }
 
-  supabaseBrowserSingleton = createBrowserClient(
+  const client = createBrowserClient(
     supabaseUrl,
-    supabaseAnonKey
+    supabaseAnonKey,
+    {
+      cookieOptions: {
+        // Keep persistent logins for 30 days when "remember me" is enabled.
+        lifetime: rememberSession ? 60 * 60 * 24 * 30 : 60 * 60 * 8,
+      },
+    }
   )
 
-  return supabaseBrowserSingleton
+  if (rememberSession) {
+    persistentBrowserClientSingleton = client
+  } else {
+    sessionBrowserClientSingleton = client
+  }
+
+  return client
 }
 
 export { getSupabaseBrowser as supabaseBrowser }

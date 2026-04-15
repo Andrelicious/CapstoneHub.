@@ -2,18 +2,23 @@ import { cookies } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AdminReviewPage } from '@/components/admin-review-page'
+import { getOCRResults as getDatasetOCRResults } from '@/lib/datasets-actions'
 
-interface Submission {
-  id: string
-  title: string
-  program: string
-  category: string
-  authors?: string[]
-  author_name?: string
-  created_at: string
-  status: string
-  abstract?: string
-  [key: string]: unknown
+function hasMissingColumnError(message: string, column: string) {
+  const normalized = (message || '').toLowerCase()
+  return (
+    normalized.includes(`could not find the '${column}' column`) ||
+    normalized.includes(`column "${column}" does not exist`) ||
+    normalized.includes(`column ${column} does not exist`)
+  )
+}
+
+function isMissingTableError(message: string, table: string) {
+  const normalized = (message || '').toLowerCase()
+  return (
+    normalized.includes(`relation "${table}" does not exist`) ||
+    normalized.includes(`could not find the table '${table}'`)
+  )
 }
 
 async function getSubmissionData(id: string) {
@@ -65,9 +70,109 @@ async function getSubmissionData(id: string) {
     ? await createSupabaseServerClient({ supabaseKey: serviceRoleKey })
     : supabase
 
-  const { data: studentProfile } = await dataSupabase.from('profiles').select('display_name').eq('id', dataset.user_id).single()
+  const readOcrResults = async (submissionId: string) => {
+    let read = await dataSupabase
+      .from('ocr_results')
+      .select('title, abstract_text, full_text, quality_flags')
+      .eq('dataset_id', submissionId)
+      .maybeSingle()
 
-  const { data: ocrResults } = await dataSupabase.from('ocr_results').select('*').eq('dataset_id', id).single()
+    if (read.error && hasMissingColumnError(read.error.message || '', 'dataset_id')) {
+      read = await dataSupabase
+        .from('ocr_results')
+        .select('title, abstract_text, full_text, quality_flags')
+        .eq('submission_id', submissionId)
+        .maybeSingle()
+    }
+
+    if (read.error) {
+      const missingInsightColumns =
+        hasMissingColumnError(read.error.message || '', 'title') ||
+        hasMissingColumnError(read.error.message || '', 'abstract_text')
+
+      if (missingInsightColumns) {
+        let fallback = await dataSupabase
+          .from('ocr_results')
+          .select('title_hint, abstract_text, full_text, quality_flags')
+          .eq('dataset_id', submissionId)
+          .maybeSingle()
+
+        if (fallback.error && hasMissingColumnError(fallback.error.message || '', 'dataset_id')) {
+          fallback = await dataSupabase
+            .from('ocr_results')
+            .select('title_hint, abstract_text, full_text, quality_flags')
+            .eq('submission_id', submissionId)
+            .maybeSingle()
+        }
+
+        return fallback
+      }
+
+      return read
+    }
+
+    return read
+  }
+
+  const { data: studentProfile } = await dataSupabase.from('profiles').select('display_name').eq('id', dataset.user_id).maybeSingle()
+
+  const actionOcrResults = await getDatasetOCRResults(id).catch(() => null)
+
+  const ocrResultsRead = actionOcrResults ? null : await readOcrResults(id)
+  const ocrResults = actionOcrResults || ocrResultsRead?.data || null
+  const ocrResultsWithFallback = ocrResults as
+    | {
+        title?: string
+        title_hint?: string
+        abstract_text?: string
+        full_text?: string
+        quality_flags?: Record<string, unknown>
+      }
+    | null
+
+  let { data: latestOcrJob, error: latestOcrJobError } = await dataSupabase
+    .from('ocr_jobs')
+    .select('status, error_message')
+    .eq('dataset_id', id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  if (latestOcrJobError && hasMissingColumnError(latestOcrJobError.message || '', 'dataset_id')) {
+    const fallbackRead = await dataSupabase
+      .from('ocr_jobs')
+      .select('status, error_message')
+      .eq('submission_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    latestOcrJob = fallbackRead.data
+    latestOcrJobError = fallbackRead.error
+  }
+
+  let ocrEventsRead = await dataSupabase
+    .from('ocr_run_events')
+    .select('status, source_type, provider_hint, duration_ms, full_text_chars, has_title, has_abstract, is_title_only_source, error_message, created_at')
+    .eq('dataset_id', id)
+    .order('created_at', { ascending: false })
+    .limit(8)
+
+  if (ocrEventsRead.error && hasMissingColumnError(ocrEventsRead.error.message || '', 'dataset_id')) {
+    ocrEventsRead = await dataSupabase
+      .from('ocr_run_events')
+      .select('status, source_type, provider_hint, duration_ms, full_text_chars, has_title, has_abstract, is_title_only_source, error_message, created_at')
+      .eq('submission_id', id)
+      .order('created_at', { ascending: false })
+      .limit(8)
+  }
+
+  const ocrEvents =
+    ocrEventsRead.error && isMissingTableError(ocrEventsRead.error.message || '', 'ocr_run_events')
+      ? []
+      : (ocrEventsRead.data || [])
+
+  const resolvedOcrStatus = latestOcrJob?.status || (ocrResults?.full_text ? 'done' : 'not_started')
 
   // Transform dataset to submission format
   const transformedSubmission = {
@@ -79,10 +184,14 @@ async function getSubmissionData(id: string) {
     student_name: studentProfile?.display_name || 'Unknown',
     submitted_date: dataset.created_at,
     status: dataset.status as 'pending_admin_review',
-    preview_text: ocrResults?.preview_text || dataset.description || 'No OCR preview available',
-    full_ocr_text: ocrResults?.full_text || 'No OCR text extracted yet',
-    quality_flags: ocrResults?.quality_flags ? Object.keys(ocrResults.quality_flags) : [],
-    file_url: dataset.file_path ? `/storage/download/${dataset.file_path}` : undefined,
+    ocr_status: resolvedOcrStatus,
+    ocr_error_message: latestOcrJob?.error_message || '',
+    full_ocr_text: ocrResultsWithFallback?.full_text || '',
+    ocr_title: ocrResultsWithFallback?.title || ocrResultsWithFallback?.title_hint || '',
+    ocr_abstract: ocrResultsWithFallback?.abstract_text || '',
+    quality_flags: ocrResultsWithFallback?.quality_flags ? Object.keys(ocrResultsWithFallback.quality_flags) : [],
+    ocr_events: ocrEvents,
+    file_url: `/api/datasets/${dataset.id}/download`,
   }
 
   return { submission: transformedSubmission }
@@ -92,7 +201,7 @@ export default async function AdminReviewRoute({ params }: { params: Promise<{ i
   const { id } = await params
   const data = await getSubmissionData(id)
 
-  if ('redirect' in data) {
+  if ('redirect' in data && data.redirect) {
     redirect(data.redirect)
   }
 
@@ -101,13 +210,17 @@ export default async function AdminReviewRoute({ params }: { params: Promise<{ i
       <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-white mb-2">Submission Not Found</h1>
-          <p className="text-muted-foreground mb-6">The submission you're looking for doesn't exist.</p>
+          <p className="text-muted-foreground mb-6">The submission you&apos;re looking for doesn&apos;t exist.</p>
           <a href="/admin/dashboard" className="text-purple-400 hover:text-purple-300">
             Back to Dashboard
           </a>
         </div>
       </div>
     )
+  }
+
+  if (!('submission' in data) || !data.submission) {
+    redirect('/admin/dashboard')
   }
 
   return <AdminReviewPage submission={data.submission} />

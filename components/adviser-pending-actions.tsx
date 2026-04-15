@@ -127,7 +127,7 @@ export function AdviserPendingActions({ capstones: initialCapstones }: AdviserPe
                 </span>
                 <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 whitespace-nowrap">
                   <Clock className="w-3 h-3 mr-1" />
-                  Pending Review
+                  Pending Admin Review
                 </Badge>
               </div>
 

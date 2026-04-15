@@ -28,6 +28,8 @@ interface Capstone {
   keywords: string[] | null
   pdf_url: string | null
   thumbnail_url: string | null
+  file_name?: string | null
+  mime_type?: string | null
   status: string
   created_at: string
 }
@@ -86,7 +88,7 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
   const statusConfig = {
     pending: {
       icon: <Clock className="w-4 h-4" />,
-      label: "Pending Review",
+      label: "Pending Admin Review",
       color: "text-yellow-400",
       bgColor: "bg-yellow-500/20 border-yellow-500/30",
     },
@@ -105,6 +107,25 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
   }
 
   const status = statusConfig[capstone.status as keyof typeof statusConfig] || statusConfig.pending
+
+  const getFileTypeLabel = () => {
+    const mime = (capstone.mime_type || '').toLowerCase()
+    const fileName = (capstone.file_name || '').toLowerCase()
+
+    if (mime.includes('pdf')) return 'PDF'
+    if (mime.includes('wordprocessingml') || mime.includes('msword')) return 'DOCX'
+    if (mime.includes('png')) return 'PNG'
+    if (mime.includes('jpeg') || mime.includes('jpg')) return 'JPEG'
+    if (mime.includes('webp')) return 'WEBP'
+
+    if (fileName.includes('.pdf')) return 'PDF'
+    if (fileName.includes('.docx') || fileName.includes('.doc')) return 'DOCX'
+    if (fileName.includes('.png')) return 'PNG'
+    if (fileName.includes('.jpeg') || fileName.includes('.jpg')) return 'JPEG'
+    if (fileName.includes('.webp')) return 'WEBP'
+
+    return 'FILE'
+  }
 
   return (
     <>
@@ -134,6 +155,9 @@ export default function CapstoneDetailClient({ capstone }: CapstoneDetailClientP
               {capstone.year}
             </span>
           )}
+          <Badge className="bg-cyan-500/15 text-cyan-300 border-cyan-500/30">
+            {getFileTypeLabel()}
+          </Badge>
         </div>
 
         {/* Title */}

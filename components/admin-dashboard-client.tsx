@@ -13,10 +13,10 @@ import {
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
 import { Clock, CheckCircle2, XCircle, Eye, Calendar } from "lucide-react"
-import type { Capstone, CapstoneStatus } from "@/types"
+import type { Capstone } from "@/types"
 import { Badge } from "@/components/ui/badge"
 
-const statusConfig: Record<CapstoneStatus, { icon: React.ReactNode; color: string; bgColor: string }> = {
+const statusConfig = {
   pending: {
     icon: <Clock className="w-4 h-4" />,
     color: "text-yellow-400",
@@ -32,7 +32,7 @@ const statusConfig: Record<CapstoneStatus, { icon: React.ReactNode; color: strin
     color: "text-red-400",
     bgColor: "bg-red-500/20 border-red-500/30",
   },
-}
+} as const
 
 interface AdminDashboardClientProps {
   initialCapstones: Capstone[]
@@ -73,7 +73,7 @@ export default function AdminDashboardClient({ initialCapstones }: AdminDashboar
             <Clock className="w-5 h-5 text-yellow-400" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Pending Review</h2>
+            <h2 className="text-xl font-semibold text-white">Pending Admin Review</h2>
             <p className="text-sm text-muted-foreground">{capstones.length} submissions awaiting review</p>
           </div>
         </div>
@@ -95,7 +95,7 @@ export default function AdminDashboardClient({ initialCapstones }: AdminDashboar
                     <div className="flex items-center gap-2 mb-2">
                       <Badge className={`${statusConfig.pending.bgColor} ${statusConfig.pending.color} border`}>
                         {statusConfig.pending.icon}
-                        <span className="ml-1 capitalize">Pending</span>
+                        <span className="ml-1 capitalize">Pending Admin Review</span>
                       </Badge>
                       <span className="text-xs text-muted-foreground flex items-center gap-1">
                         <Calendar className="w-3 h-3" />

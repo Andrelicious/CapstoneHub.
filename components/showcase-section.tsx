@@ -40,11 +40,11 @@ const showcaseItems = [
     ),
   },
   {
-    title: "Upload Form",
-    description: "Simple and intuitive upload process",
+    title: "Submission Workflow",
+    description: "Guided submission with OCR processing",
     icon: Upload,
-    href: "/upload",
-    buttonText: "Upload Capstone",
+    href: "/submit",
+    buttonText: "Start Submission",
     content: (
       <div className="space-y-4">
         <div className="space-y-2">
@@ -62,7 +62,7 @@ const showcaseItems = [
         </div>
         <div className="p-6 rounded-lg border-2 border-dashed border-purple-500/30 bg-purple-500/5 text-center">
           <Upload className="w-8 h-8 text-purple-400 mx-auto mb-2" />
-          <p className="text-sm text-gray-400">Drop files or click to upload</p>
+          <p className="text-sm text-gray-400">Attach manuscript and continue OCR processing</p>
         </div>
       </div>
     ),

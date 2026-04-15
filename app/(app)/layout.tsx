@@ -34,10 +34,10 @@ export default async function AppLayout({
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0612] flex flex-col">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Background effects */}
       <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
-        <div className="absolute inset-0 bg-[#0a0612]" />
+        <div className="absolute inset-0 bg-background" />
         <div className="absolute top-0 right-0 w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[150px] animate-pulse" />
         <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-cyan-500/10 rounded-full blur-[150px] animate-pulse" />
       </div>

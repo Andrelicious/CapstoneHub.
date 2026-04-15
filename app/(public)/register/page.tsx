@@ -16,19 +16,19 @@ const roleOptions: { value: UserRole; label: string; description: string; icon: 
   {
     value: "student",
     label: "Student",
-    description: "Upload and manage your capstone projects",
+    description: "Submit, track, and showcase your research outputs",
     icon: GraduationCap,
   },
   {
     value: "adviser",
     label: "Adviser",
-    description: "Browse and advise student research",
+    description: "Guide quality research with repository-wide visibility",
     icon: Users,
   },
   {
     value: "admin",
     label: "Admin",
-    description: "Manage submissions and approvals",
+    description: "Govern workflows, approvals, and academic standards",
     icon: Shield,
   },
 ]
@@ -161,11 +161,12 @@ export default function RegisterPage() {
 
   return (
     <AuthLayout>
-      <div className="bg-[#1a1425]/90 backdrop-blur-xl rounded-2xl p-8 border border-white/10 shadow-2xl shadow-purple-500/10">
+      <div className="bg-card/90 backdrop-blur-xl rounded-2xl p-8 border border-border shadow-2xl shadow-purple-500/10">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
-          <p className="text-gray-400">Join the CCS capstone community</p>
+          <p className="text-xs font-semibold tracking-[0.2em] text-cyan-500 uppercase mb-2">Build Your Research Presence</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Create Your Capstone Hub Account</h1>
+          <p className="text-muted-foreground">Join a high-trust platform for submission, review, and discovery of academic research.</p>
         </div>
 
         {/* Form */}
@@ -175,7 +176,7 @@ export default function RegisterPage() {
           )}
 
           <div className="space-y-3">
-            <Label className="text-gray-300">I am a</Label>
+            <Label className="text-foreground">Choose your role</Label>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               {roleOptions.map((option) => {
                 const IconComponent = option.icon
@@ -187,7 +188,7 @@ export default function RegisterPage() {
                     className={`p-4 rounded-xl border text-left transition-all duration-200 ${
                       formData.role === option.value
                         ? "border-purple-500 bg-purple-500/10"
-                        : "border-white/10 hover:border-white/20 bg-[#0a0612]"
+                        : "border-border hover:border-border bg-background"
                     }`}
                   >
                     <div className="flex items-center gap-3 mb-2">
@@ -195,7 +196,7 @@ export default function RegisterPage() {
                         className={`w-5 h-5 ${formData.role === option.value ? "text-purple-400" : "text-gray-500"}`}
                       />
                       <span
-                        className={`font-medium ${formData.role === option.value ? "text-white" : "text-gray-400"}`}
+                        className={`font-medium ${formData.role === option.value ? "text-foreground" : "text-muted-foreground"}`}
                       >
                         {option.label}
                       </span>
@@ -209,7 +210,7 @@ export default function RegisterPage() {
 
           {/* Full Name */}
           <div className="space-y-2">
-            <Label htmlFor="fullName" className="text-gray-300">
+            <Label htmlFor="fullName" className="text-foreground">
               Full Name
             </Label>
             <div className="relative">
@@ -223,7 +224,7 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 required
                 disabled={loading}
-                className="pl-10 bg-[#0a0612] border-white/10 focus:border-purple-500 focus:ring-purple-500/20 text-white placeholder:text-gray-500 h-12"
+                className="pl-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
             </div>
           </div>
@@ -231,7 +232,7 @@ export default function RegisterPage() {
           {/* Student ID - Only for students */}
           {formData.role === "student" && (
             <div className="space-y-2">
-              <Label htmlFor="studentId" className="text-gray-300">
+              <Label htmlFor="studentId" className="text-foreground">
                 Student ID
               </Label>
               <div className="relative">
@@ -244,7 +245,7 @@ export default function RegisterPage() {
                   value={formData.studentId}
                   onChange={handleChange}
                   disabled={loading}
-                  className="pl-10 bg-[#0a0612] border-white/10 focus:border-purple-500 focus:ring-purple-500/20 text-white placeholder:text-gray-500 h-12"
+                  className="pl-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
                 />
               </div>
             </div>
@@ -252,7 +253,7 @@ export default function RegisterPage() {
 
           {/* Email */}
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-gray-300">
+            <Label htmlFor="email" className="text-foreground">
               Email Address
             </Label>
             <div className="relative">
@@ -266,14 +267,14 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 required
                 disabled={loading}
-                className="pl-10 bg-[#0a0612] border-white/10 focus:border-purple-500 focus:ring-purple-500/20 text-white placeholder:text-gray-500 h-12"
+                className="pl-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
             </div>
           </div>
 
           {/* Password */}
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-gray-300">
+            <Label htmlFor="password" className="text-foreground">
               Password
             </Label>
             <div className="relative">
@@ -287,12 +288,12 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 required
                 disabled={loading}
-                className="pl-10 pr-10 bg-[#0a0612] border-white/10 focus:border-purple-500 focus:ring-purple-500/20 text-white placeholder:text-gray-500 h-12"
+                className="pl-10 pr-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-foreground transition-colors"
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -301,7 +302,7 @@ export default function RegisterPage() {
 
           {/* Confirm Password */}
           <div className="space-y-2">
-            <Label htmlFor="confirmPassword" className="text-gray-300">
+            <Label htmlFor="confirmPassword" className="text-foreground">
               Confirm Password
             </Label>
             <div className="relative">
@@ -315,12 +316,12 @@ export default function RegisterPage() {
                 onChange={handleChange}
                 required
                 disabled={loading}
-                className="pl-10 pr-10 bg-[#0a0612] border-white/10 focus:border-purple-500 focus:ring-purple-500/20 text-white placeholder:text-gray-500 h-12"
+                className="pl-10 pr-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-foreground transition-colors"
               >
                 {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -339,7 +340,7 @@ export default function RegisterPage() {
               </>
             ) : (
               <>
-                Create Account
+                Create My Workspace
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </>
             )}
@@ -347,10 +348,10 @@ export default function RegisterPage() {
         </form>
 
         {/* Sign in link */}
-        <p className="text-center mt-8 text-gray-400">
-          Already have an account?{" "}
+        <p className="text-center mt-8 text-muted-foreground">
+          Already part of Capstone Hub?{" "}
           <Link href="/login" className="text-purple-400 hover:text-purple-300 font-medium transition-colors">
-            Sign in
+            Access your workspace
           </Link>
         </p>
       </div>

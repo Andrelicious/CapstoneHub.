@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" role="img" aria-label="Capstone Hub logo">
+  <defs>
+    <linearGradient id="ring" x1="24" y1="232" x2="232" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#22c7ff"/>
+      <stop offset="1" stop-color="#8a7dff"/>
+    </linearGradient>
+    <linearGradient id="dot" x1="88" y1="34" x2="120" y2="34" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#5aa9ff"/>
+      <stop offset="1" stop-color="#8a7dff"/>
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(128 128) rotate(45) translate(-128 -128)">
+    <rect x="36" y="36" width="184" height="184" rx="30" fill="none" stroke="url(#ring)" stroke-width="14"/>
+    <rect x="58" y="58" width="140" height="140" rx="22" fill="#0b123b"/>
+  </g>
+
+  <text x="128" y="152" text-anchor="middle" font-size="94" font-family="Segoe UI, Arial, sans-serif" font-weight="700" fill="#ffffff">C</text>
+  <circle cx="100" cy="36" r="11" fill="url(#dot)"/>
+</svg>

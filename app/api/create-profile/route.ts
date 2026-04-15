@@ -43,17 +43,6 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const { error: metadataError } = await supabase.auth.admin.updateUserById(id, {
-      user_metadata: {
-        display_name,
-        role: normalizedRole,
-      },
-    })
-
-    if (metadataError) {
-      console.error('Metadata sync warning:', metadataError)
-    }
-
     return NextResponse.json(
       { message: 'Profile created successfully' },
       { status: 200 }

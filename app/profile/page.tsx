@@ -57,19 +57,19 @@ export default function ProfilePage() {
           bio: profileData.bio || "",
         })
       } else {
-        // Create profile from user metadata
+        // Create local fallback from auth user only
         setProfile({
           id: user.id,
-          display_name: user.user_metadata?.display_name || user.email?.split("@")[0] || "",
+          display_name: user.email?.split("@")[0] || "",
           email: user.email || "",
-          role: user.user_metadata?.role || "student",
-          organization: user.user_metadata?.student_id || "",
+          role: "student",
+          organization: "",
           bio: "",
           avatar_url: null,
         })
         setFormData({
-          display_name: user.user_metadata?.display_name || "",
-          organization: user.user_metadata?.student_id || "",
+          display_name: user.email?.split("@")[0] || "",
+          organization: "",
           bio: "",
         })
       }
@@ -124,30 +124,30 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0612] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0612]">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <div className="pt-24 pb-12 px-6">
         <div className="max-w-2xl mx-auto">
           {/* Back button */}
           <Link
             href="/student/dashboard"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
+            Return to Workspace
           </Link>
 
-          <Card className="bg-[#1a1625]/80 border-white/10">
+          <Card className="bg-card border-border">
             <CardHeader>
-              <CardTitle className="text-white text-2xl">Your Profile</CardTitle>
-              <CardDescription className="text-gray-400">Manage your account information</CardDescription>
+              <CardTitle className="text-foreground text-2xl">Profile Identity</CardTitle>
+              <CardDescription className="text-muted-foreground">Manage your account identity and research profile</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               {/* Avatar Section */}
@@ -156,18 +156,18 @@ export default function ProfilePage() {
                   {getUserInitials()}
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-white">{formData.display_name || "User"}</h3>
-                  <p className="text-gray-400">{profile?.email}</p>
+                  <h3 className="text-lg font-semibold text-foreground">{formData.display_name || "User"}</h3>
+                  <p className="text-muted-foreground">{profile?.email}</p>
                   <span className="inline-block mt-1 px-3 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400 capitalize">
                     {profile?.role}
                   </span>
                 </div>
               </div>
 
-              <div className="border-t border-white/10 pt-6 space-y-4">
+              <div className="border-t border-border pt-6 space-y-4">
                 {/* Display Name */}
                 <div className="space-y-2">
-                  <Label htmlFor="display_name" className="text-gray-300">
+                  <Label htmlFor="display_name" className="text-foreground">
                     Display Name
                   </Label>
                   <div className="relative">
@@ -176,7 +176,7 @@ export default function ProfilePage() {
                       id="display_name"
                       value={formData.display_name}
                       onChange={(e) => setFormData({ ...formData, display_name: e.target.value })}
-                      className="pl-10 bg-white/5 border-white/10 focus:border-purple-500 text-white h-12"
+                      className="pl-10 bg-background border-border focus:border-purple-500 text-foreground h-12"
                       placeholder="Your name"
                     />
                   </div>
@@ -184,7 +184,7 @@ export default function ProfilePage() {
 
                 {/* Email (read-only) */}
                 <div className="space-y-2">
-                  <Label htmlFor="email" className="text-gray-300">
+                  <Label htmlFor="email" className="text-foreground">
                     Email Address
                   </Label>
                   <div className="relative">
@@ -193,7 +193,7 @@ export default function ProfilePage() {
                       id="email"
                       value={profile?.email || ""}
                       disabled
-                      className="pl-10 bg-white/5 border-white/10 text-gray-400 h-12 cursor-not-allowed"
+                      className="pl-10 bg-background border-border text-muted-foreground h-12 cursor-not-allowed"
                     />
                   </div>
                   <p className="text-xs text-gray-500">Email cannot be changed</p>
@@ -201,7 +201,7 @@ export default function ProfilePage() {
 
                 {/* Organization / Student ID */}
                 <div className="space-y-2">
-                  <Label htmlFor="organization" className="text-gray-300">
+                  <Label htmlFor="organization" className="text-foreground">
                     {profile?.role === "student" ? "Student ID" : "Department"}
                   </Label>
                   <div className="relative">
@@ -214,7 +214,7 @@ export default function ProfilePage() {
                       id="organization"
                       value={formData.organization}
                       onChange={(e) => setFormData({ ...formData, organization: e.target.value })}
-                      className="pl-10 bg-white/5 border-white/10 focus:border-purple-500 text-white h-12"
+                      className="pl-10 bg-background border-border focus:border-purple-500 text-foreground h-12"
                       placeholder={profile?.role === "student" ? "2024-00001" : "Computer Science"}
                     />
                   </div>
@@ -222,14 +222,14 @@ export default function ProfilePage() {
 
                 {/* Bio */}
                 <div className="space-y-2">
-                  <Label htmlFor="bio" className="text-gray-300">
+                  <Label htmlFor="bio" className="text-foreground">
                     Bio
                   </Label>
                   <Textarea
                     id="bio"
                     value={formData.bio}
                     onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                    className="bg-white/5 border-white/10 focus:border-purple-500 text-white min-h-[100px] resize-none"
+                    className="bg-background border-border focus:border-purple-500 text-foreground min-h-[100px] resize-none"
                     placeholder="Tell us about yourself..."
                   />
                 </div>
@@ -248,7 +248,7 @@ export default function ProfilePage() {
                   ) : (
                     <>
                       <Save className="w-5 h-5 mr-2" />
-                      Save Changes
+                      Save Profile Updates
                     </>
                   )}
                 </Button>

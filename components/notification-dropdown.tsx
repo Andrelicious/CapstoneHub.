@@ -1,6 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
+import { useState, useEffect, useRef, useCallback } from "react"
+import { useRouter } from "next/navigation"
 import { Bell, CheckCircle2, XCircle, FileText, Clock } from "lucide-react"
 import { supabaseBrowser } from "@/lib/supabase/browser"
 
@@ -9,6 +10,7 @@ interface Notification {
   type: string
   title: string
   description: string
+  reference_id: string | null
   is_read: boolean
   created_at: string
 }
@@ -19,11 +21,16 @@ interface NotificationDropdownProps {
 }
 
 export function NotificationDropdown({ userId, userRole }: NotificationDropdownProps) {
+  const router = useRouter()
+  const normalizedRole = (userRole || "student").toLowerCase()
   const [isOpen, setIsOpen] = useState(false)
   const [notifications, setNotifications] = useState<Notification[]>([])
   const [loading, setLoading] = useState(false)
   const [filter, setFilter] = useState<"all" | "unread">("all")
+  const [showRealtimeToast, setShowRealtimeToast] = useState(false)
+  const [incomingCount, setIncomingCount] = useState(0)
   const dropdownRef = useRef<HTMLDivElement>(null)
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
 
@@ -37,54 +44,199 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
     return () => document.removeEventListener("mousedown", handleClickOutside)
   }, [])
 
-  useEffect(() => {
-    if (!isOpen || !userId) return
+  const fetchNotifications = useCallback(
+    async (showLoading: boolean) => {
+      if (!userId) return
 
-    let cancelled = false
-    const timeoutId = setTimeout(() => {
-      if (!cancelled) {
-        setLoading(false)
-        setNotifications([])
+      if (showLoading) {
+        setLoading(true)
       }
-    }, 3000) // 3 second timeout - show empty state if takes too long
 
-    const fetchNotifications = async () => {
-      setLoading(true)
       try {
         const supabase = supabaseBrowser()
         const { data, error } = await supabase
           .from("notifications")
           .select("*")
-          .eq("user_id", userId)
+          .or(`user_id.eq.${userId},target_role.eq.${normalizedRole}`)
           .order("created_at", { ascending: false })
           .limit(20)
 
-        if (!cancelled) {
-          clearTimeout(timeoutId)
-          setNotifications(error ? [] : data || [])
-          setLoading(false)
-        }
+        setNotifications(error ? [] : data || [])
       } catch {
-        if (!cancelled) {
-          clearTimeout(timeoutId)
-          setNotifications([])
+        setNotifications([])
+      } finally {
+        if (showLoading) {
           setLoading(false)
         }
       }
+    },
+    [userId, normalizedRole]
+  )
+
+  useEffect(() => {
+    void fetchNotifications(false)
+  }, [fetchNotifications])
+
+  useEffect(() => {
+    if (!isOpen) return
+    void fetchNotifications(true)
+  }, [isOpen, fetchNotifications])
+
+  useEffect(() => {
+    if (!isOpen) return
+
+    setShowRealtimeToast(false)
+    setIncomingCount(0)
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
+      toastTimerRef.current = null
+    }
+  }, [isOpen])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimerRef.current) {
+        clearTimeout(toastTimerRef.current)
+        toastTimerRef.current = null
+      }
+    }
+  }, [])
+
+  const triggerRealtimeToast = useCallback(() => {
+    if (isOpen) {
+      return
     }
 
-    fetchNotifications()
+    setShowRealtimeToast(true)
+    setIncomingCount((prev) => Math.min(prev + 1, 9))
+
+    if (toastTimerRef.current) {
+      clearTimeout(toastTimerRef.current)
+    }
+
+    toastTimerRef.current = setTimeout(() => {
+      setShowRealtimeToast(false)
+      setIncomingCount(0)
+      toastTimerRef.current = null
+    }, 3000)
+  }, [isOpen])
+
+  useEffect(() => {
+    if (!userId) return
+
+    const supabase = supabaseBrowser()
+    const channel = supabase
+      .channel(`notifications-dropdown-${userId}-${userRole}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          triggerRealtimeToast()
+          void fetchNotifications(false)
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `target_role=eq.${userRole || "student"}`,
+        },
+        () => {
+          triggerRealtimeToast()
+          void fetchNotifications(false)
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void fetchNotifications(false)
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `target_role=eq.${normalizedRole}`,
+        },
+        () => {
+          void fetchNotifications(false)
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `target_role=eq.${normalizedRole}`,
+        },
+        () => {
+          void fetchNotifications(false)
+        }
+      )
+      .subscribe()
 
     return () => {
-      cancelled = true
-      clearTimeout(timeoutId)
+      void supabase.removeChannel(channel)
     }
-  }, [isOpen, userId])
+  }, [userId, normalizedRole, fetchNotifications, triggerRealtimeToast])
 
   const markAsRead = async (id: string) => {
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, is_read: true } : n)))
     const supabase = supabaseBrowser()
     await supabase.from("notifications").update({ is_read: true }).eq("id", id)
+  }
+
+  const getNotificationRoute = useCallback(
+    (notification: Notification) => {
+      if (!notification.reference_id) return "/notifications"
+
+      if (notification.type === "pending_submission") {
+        return normalizedRole === "admin" ? `/admin/review/${notification.reference_id}` : `/submissions/${notification.reference_id}`
+      }
+
+      if (notification.type === "repository_approved") {
+        return `/capstones/${notification.reference_id}`
+      }
+
+      if (
+        notification.type === "capstone_approved" ||
+        notification.type === "capstone_rejected" ||
+        notification.type === "revision_requested" ||
+        notification.type === "capstone_recommended"
+      ) {
+        return normalizedRole === "adviser" && notification.type === "capstone_approved"
+          ? `/capstones/${notification.reference_id}`
+          : `/submissions/${notification.reference_id}`
+      }
+
+      return "/notifications"
+    },
+    [normalizedRole]
+  )
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id)
+    }
+
+    setIsOpen(false)
+    router.push(getNotificationRoute(notification))
   }
 
   const markAllAsRead = async () => {
@@ -98,12 +250,16 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
 
   const getIcon = (type: string) => {
     switch (type) {
+      case "repository_approved":
+        return { icon: CheckCircle2, color: "text-green-400", bg: "bg-green-500/20" }
       case "capstone_approved":
         return { icon: CheckCircle2, color: "text-green-400", bg: "bg-green-500/20" }
       case "capstone_rejected":
         return { icon: XCircle, color: "text-red-400", bg: "bg-red-500/20" }
       case "pending_submission":
         return { icon: Clock, color: "text-yellow-400", bg: "bg-yellow-500/20" }
+      case "revision_requested":
+        return { icon: FileText, color: "text-orange-400", bg: "bg-orange-500/20" }
       default:
         return { icon: FileText, color: "text-cyan-400", bg: "bg-cyan-500/20" }
     }
@@ -144,9 +300,9 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
     <div className="relative" ref={dropdownRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative p-2 rounded-lg hover:bg-white/10 transition-colors"
+        className="relative p-2 rounded-lg hover:bg-accent transition-colors"
       >
-        <Bell className="w-5 h-5 text-gray-300" />
+        <Bell className="w-5 h-5 text-muted-foreground" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 w-5 h-5 bg-purple-500 rounded-full text-xs font-bold flex items-center justify-center text-white">
             {unreadCount > 9 ? "9+" : unreadCount}
@@ -154,11 +310,17 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
         )}
       </button>
 
+      {showRealtimeToast && !isOpen && (
+        <div className="absolute right-0 top-full mt-2 rounded-lg border border-cyan-400/30 bg-card/95 px-3 py-2 text-xs text-cyan-300 shadow-lg shadow-cyan-500/20 z-50 animate-in fade-in slide-in-from-top-1 duration-200">
+          {incomingCount > 1 ? `${incomingCount} new notifications` : "New notification"}
+        </div>
+      )}
+
       {isOpen && (
-        <div className="absolute right-0 top-full mt-2 w-80 md:w-96 bg-[#1a1025] border border-white/10 rounded-xl shadow-xl shadow-black/50 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
-          <div className="p-4 border-b border-white/10">
+        <div className="absolute right-0 top-full mt-2 w-80 md:w-96 bg-card border border-border rounded-xl shadow-xl shadow-black/30 overflow-hidden z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div className="p-4 border-b border-border">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-lg font-bold text-white">Notifications</h3>
+              <h3 className="text-lg font-bold text-foreground">Notifications</h3>
               {unreadCount > 0 && (
                 <button
                   onClick={markAllAsRead}
@@ -175,7 +337,7 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   filter === "all"
                     ? "bg-purple-500/20 text-purple-300"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 All
@@ -185,7 +347,7 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
                 className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
                   filter === "unread"
                     ? "bg-purple-500/20 text-purple-300"
-                    : "text-gray-400 hover:text-white hover:bg-white/5"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
                 }`}
               >
                 Unread
@@ -202,7 +364,7 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
               <div className="p-8 text-center">
                 <Bell className="w-10 h-10 text-gray-600 mx-auto mb-2" />
                 <p className="text-gray-400 text-sm">
-                  {filter === "unread" ? "No unread notifications" : "No notifications yet"}
+                  {filter === "unread" ? "No unread updates" : "No updates yet"}
                 </p>
               </div>
             ) : (
@@ -215,8 +377,8 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
                       return (
                         <button
                           key={notification.id}
-                          onClick={() => !notification.is_read && markAsRead(notification.id)}
-                          className={`w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-start gap-3 ${
+                          onClick={() => void handleNotificationClick(notification)}
+                          className={`w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start gap-3 ${
                             !notification.is_read ? "bg-purple-500/5" : ""
                           }`}
                         >
@@ -225,12 +387,10 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
                           </div>
                           <div className="flex-1 min-w-0">
                             <p
-                              className={`text-sm line-clamp-2 ${notification.is_read ? "text-gray-400" : "text-white"}`}
+                              className={`text-sm line-clamp-2 ${notification.is_read ? "text-muted-foreground" : "text-foreground"}`}
                             >
                               <span className="font-medium">{notification.title}</span>
-                              {notification.description && (
-                                <span className="text-gray-400"> - {notification.description}</span>
-                              )}
+                              {notification.description && <span className="text-muted-foreground"> - {notification.description}</span>}
                             </p>
                             <p className="text-xs text-gray-500 mt-1">{formatTime(notification.created_at)}</p>
                           </div>
@@ -251,8 +411,8 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
                       return (
                         <button
                           key={notification.id}
-                          onClick={() => !notification.is_read && markAsRead(notification.id)}
-                          className={`w-full text-left px-4 py-3 hover:bg-white/5 transition-colors flex items-start gap-3 ${
+                          onClick={() => void handleNotificationClick(notification)}
+                          className={`w-full text-left px-4 py-3 hover:bg-accent transition-colors flex items-start gap-3 ${
                             !notification.is_read ? "bg-purple-500/5" : ""
                           }`}
                         >
@@ -261,12 +421,10 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
                           </div>
                           <div className="flex-1 min-w-0">
                             <p
-                              className={`text-sm line-clamp-2 ${notification.is_read ? "text-gray-400" : "text-white"}`}
+                              className={`text-sm line-clamp-2 ${notification.is_read ? "text-muted-foreground" : "text-foreground"}`}
                             >
                               <span className="font-medium">{notification.title}</span>
-                              {notification.description && (
-                                <span className="text-gray-400"> - {notification.description}</span>
-                              )}
+                              {notification.description && <span className="text-muted-foreground"> - {notification.description}</span>}
                             </p>
                             <p className="text-xs text-gray-500 mt-1">{formatTime(notification.created_at)}</p>
                           </div>
@@ -282,12 +440,12 @@ export function NotificationDropdown({ userId, userRole }: NotificationDropdownP
             )}
           </div>
 
-          <div className="p-3 border-t border-white/10">
+          <div className="p-3 border-t border-border">
             <a
               href="/notifications"
-              className="block w-full text-center py-2 text-sm text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-colors"
+              className="block w-full text-center py-2 text-sm text-muted-foreground hover:text-foreground hover:bg-accent rounded-lg transition-colors"
             >
-              See all notifications
+              Open Notification Center
             </a>
           </div>
         </div>

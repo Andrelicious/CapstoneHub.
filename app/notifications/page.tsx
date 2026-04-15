@@ -31,7 +31,7 @@ function GlassToast({ toast, onClose }: { toast: ToastData; onClose: () => void 
   }, [onClose])
 
   return (
-    <div className="fixed bottom-6 right-6 max-w-sm rounded-xl bg-black/60 border border-white/10 backdrop-blur-xl shadow-lg shadow-purple-500/30 px-4 py-3 flex items-start gap-3 text-sm text-gray-100 z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
+    <div className="fixed bottom-6 right-6 max-w-sm rounded-xl bg-card/95 border border-border backdrop-blur-xl shadow-lg shadow-purple-500/20 px-4 py-3 flex items-start gap-3 text-sm text-foreground z-50 animate-in slide-in-from-bottom-4 fade-in duration-300">
       <div
         className={`mt-0.5 h-8 w-8 rounded-full flex items-center justify-center text-white text-lg flex-shrink-0 ${
           toast.type === "success"
@@ -43,9 +43,9 @@ function GlassToast({ toast, onClose }: { toast: ToastData; onClose: () => void 
       </div>
       <div className="flex-1 min-w-0">
         <p className="font-semibold">{toast.title}</p>
-        <p className="text-xs text-gray-300 mt-0.5">{toast.description}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{toast.description}</p>
       </div>
-      <button onClick={onClose} className="ml-2 text-gray-400 hover:text-gray-100 transition-colors flex-shrink-0">
+      <button onClick={onClose} className="ml-2 text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
         <X className="w-4 h-4" />
       </button>
     </div>
@@ -55,19 +55,40 @@ function GlassToast({ toast, onClose }: { toast: ToastData; onClose: () => void 
 export default function NotificationsPage() {
   const [loading, setLoading] = useState(true)
   const [notifications, setNotifications] = useState<Notification[]>([])
+  const [userId, setUserId] = useState<string>("")
   const [userRole, setUserRole] = useState<string>("student")
   const [markingAll, setMarkingAll] = useState(false)
   const [markingIds, setMarkingIds] = useState<Set<string>>(new Set())
   const [toast, setToast] = useState<ToastData | null>(null)
   const router = useRouter()
+  const normalizedRole = (userRole || "student").toLowerCase()
 
   const showToast = useCallback((type: "success" | "error", title: string, description: string) => {
     setToast({ type, title, description })
   }, [])
 
+  const fetchNotifications = useCallback(async (targetUserId: string, role: string) => {
+    const supabase = supabaseBrowser()
+    const { data: notifs, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .or(`user_id.eq.${targetUserId},target_role.eq.${role}`)
+      .order("created_at", { ascending: false })
+      .limit(50)
+
+    if (!error && notifs) {
+      setNotifications(notifs)
+      return
+    }
+
+    setNotifications([])
+  }, [])
+
   useEffect(() => {
-    const fetchNotifications = async () => {
-        const supabase = supabaseBrowser()
+    let isMounted = true
+
+    const initialize = async () => {
+      const supabase = supabaseBrowser()
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -79,35 +100,110 @@ export default function NotificationsPage() {
 
       const { data: profile } = await supabase.from("profiles").select("role, display_name").eq("id", user.id).single()
 
-      if (profile) {
-        setUserRole(profile.role || "student")
+      if (!isMounted) return
+
+      const resolvedRole = typeof profile?.role === "string" ? profile.role.toLowerCase() : "student"
+      setUserId(user.id)
+      setUserRole(resolvedRole)
+      await fetchNotifications(user.id, resolvedRole)
+
+      if (isMounted) {
+        setLoading(false)
       }
-
-      const { data: notifs, error } = await supabase
-        .from("notifications")
-        .select("*")
-        .or(`user_id.eq.${user.id},target_role.eq.${profile?.role || "student"}`)
-        .order("created_at", { ascending: false })
-        .limit(50)
-
-      if (!error && notifs) {
-        setNotifications(notifs)
-      }
-
-      setLoading(false)
     }
 
-    fetchNotifications()
-  }, [router])
+    void initialize()
+
+    return () => {
+      isMounted = false
+    }
+  }, [router, fetchNotifications])
+
+  useEffect(() => {
+    if (!userId) return
+
+    const supabase = supabaseBrowser()
+    const channel = supabase
+      .channel(`notifications-page-${userId}-${userRole}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void fetchNotifications(userId, userRole)
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `target_role=eq.${userRole}`,
+        },
+        () => {
+          void fetchNotifications(userId, userRole)
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          void fetchNotifications(userId, userRole)
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "notifications",
+          filter: `target_role=eq.${normalizedRole}`,
+        },
+        () => {
+          void fetchNotifications(userId, userRole)
+        }
+      )
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "notifications",
+          filter: `target_role=eq.${normalizedRole}`,
+        },
+        () => {
+          void fetchNotifications(userId, userRole)
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [userId, userRole, normalizedRole, fetchNotifications])
 
   const getIcon = (type: string) => {
     switch (type) {
+      case "repository_approved":
+        return { icon: CheckCircle2, color: "text-green-400", bg: "bg-green-500/20" }
       case "capstone_approved":
         return { icon: CheckCircle2, color: "text-green-400", bg: "bg-green-500/20" }
       case "capstone_rejected":
         return { icon: XCircle, color: "text-red-400", bg: "bg-red-500/20" }
       case "pending_submission":
         return { icon: Clock, color: "text-yellow-400", bg: "bg-yellow-500/20" }
+      case "revision_requested":
+        return { icon: FileText, color: "text-orange-400", bg: "bg-orange-500/20" }
       default:
         return { icon: FileText, color: "text-cyan-400", bg: "bg-cyan-500/20" }
     }
@@ -152,6 +248,42 @@ export default function NotificationsPage() {
     })
   }
 
+  const getNotificationRoute = useCallback(
+    (notification: Notification) => {
+      if (!notification.reference_id) return "/notifications"
+
+      if (notification.type === "pending_submission") {
+        return normalizedRole === "admin" ? `/admin/review/${notification.reference_id}` : `/submissions/${notification.reference_id}`
+      }
+
+      if (notification.type === "repository_approved") {
+        return `/capstones/${notification.reference_id}`
+      }
+
+      if (
+        notification.type === "capstone_approved" ||
+        notification.type === "capstone_rejected" ||
+        notification.type === "revision_requested" ||
+        notification.type === "capstone_recommended"
+      ) {
+        return normalizedRole === "adviser" && notification.type === "capstone_approved"
+          ? `/capstones/${notification.reference_id}`
+          : `/submissions/${notification.reference_id}`
+      }
+
+      return "/notifications"
+    },
+    [normalizedRole]
+  )
+
+  const handleNotificationClick = async (notification: Notification) => {
+    if (!notification.is_read) {
+      await markAsRead(notification.id)
+    }
+
+    router.push(getNotificationRoute(notification))
+  }
+
   const markAllAsRead = async () => {
     if (markingAll) return
 
@@ -179,8 +311,8 @@ export default function NotificationsPage() {
   }
 
   const getDashboardUrl = () => {
-    if (userRole === "admin") return "/admin/dashboard"
-    if (userRole === "adviser") return "/adviser/dashboard"
+    if (normalizedRole === "admin") return "/admin/dashboard"
+    if (normalizedRole === "adviser") return "/adviser/dashboard"
     return "/student/dashboard"
   }
 
@@ -188,23 +320,23 @@ export default function NotificationsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0612] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-cyan-500" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-[#0a0612]">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <div className="pt-24 pb-12 px-6">
         <div className="max-w-3xl mx-auto">
           <a
             href={getDashboardUrl()}
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
+            Return to Workspace
           </a>
 
           <div className="flex items-center justify-between mb-8">
@@ -213,8 +345,8 @@ export default function NotificationsPage() {
                 <Bell className="w-6 h-6 text-cyan-400" />
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-white">Notifications</h1>
-                <p className="text-gray-400">
+                <h1 className="text-3xl font-bold text-foreground">Notifications</h1>
+                <p className="text-muted-foreground">
                   {unreadCount} unread notification{unreadCount !== 1 ? "s" : ""}
                 </p>
               </div>
@@ -224,10 +356,10 @@ export default function NotificationsPage() {
                 variant="outline"
                 onClick={markAllAsRead}
                 disabled={markingAll}
-                className="bg-white/5 border-white/10 text-white hover:bg-white/10 gap-2 disabled:opacity-50"
+                className="bg-card border-border text-foreground hover:bg-accent gap-2 disabled:opacity-50"
               >
                 {markingAll ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                {markingAll ? "Updating..." : "Mark all as read"}
+                {markingAll ? "Applying..." : "Mark all as reviewed"}
               </Button>
             )}
           </div>
@@ -239,11 +371,11 @@ export default function NotificationsPage() {
               return (
                 <button
                   key={notification.id}
-                  onClick={() => !notification.is_read && markAsRead(notification.id)}
+                  onClick={() => void handleNotificationClick(notification)}
                   disabled={isMarking}
                   className={`w-full text-left p-4 rounded-xl transition-all ${
                     notification.is_read
-                      ? "bg-white/5 hover:bg-white/10"
+                      ? "bg-card hover:bg-accent"
                       : "bg-gradient-to-r from-cyan-500/10 to-purple-500/10 hover:from-cyan-500/15 hover:to-purple-500/15"
                   } ${isMarking ? "opacity-70" : ""}`}
                 >
@@ -254,10 +386,10 @@ export default function NotificationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-4">
                         <div>
-                          <h3 className={`font-semibold ${notification.is_read ? "text-gray-400" : "text-white"}`}>
+                          <h3 className={`font-semibold ${notification.is_read ? "text-muted-foreground" : "text-foreground"}`}>
                             {notification.title}
                           </h3>
-                          <p className="text-sm text-gray-400 mt-1 line-clamp-2">{notification.description}</p>
+                          <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{notification.description}</p>
                         </div>
                         {!notification.is_read && (
                           <div className="w-2.5 h-2.5 rounded-full bg-cyan-400 flex-shrink-0 mt-2" />
@@ -272,12 +404,12 @@ export default function NotificationsPage() {
           </div>
 
           {notifications.length === 0 && (
-            <div className="bg-white/5 rounded-xl p-12 text-center">
+            <div className="bg-card rounded-xl p-12 text-center border border-border">
               <div className="w-16 h-16 rounded-full bg-cyan-500/20 flex items-center justify-center mx-auto mb-4">
                 <Bell className="w-8 h-8 text-cyan-400" />
               </div>
-              <h3 className="text-lg font-semibold text-white">No notifications yet</h3>
-              <p className="text-gray-400 mt-1">You're all caught up!</p>
+              <h3 className="text-lg font-semibold text-foreground">No updates yet</h3>
+              <p className="text-muted-foreground mt-1">All activity is fully up to date.</p>
             </div>
           )}
         </div>

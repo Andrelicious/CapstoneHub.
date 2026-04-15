@@ -1,6 +1,12 @@
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { NextResponse } from "next/server"
 
+const normalizeRole = (role: string | null | undefined) => {
+  const value = (role || "").toLowerCase()
+  if (value === "admin" || value === "adviser" || value === "student") return value
+  return null
+}
+
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url)
   const code = searchParams.get("code")
@@ -20,28 +26,39 @@ export async function GET(request: Request) {
     }
 
     if (data.user) {
-      // Check if profile exists, create if not
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", data.user.id).single()
+      const provider = String((data.user.app_metadata as Record<string, unknown> | undefined)?.provider || "")
+      const isOAuthLogin = provider === "google" || provider === "github"
 
-      if (!profile) {
-        await supabase.from("profiles").insert({
+      const userMeta = data.user.user_metadata as Record<string, unknown> | undefined
+      const identityDisplayName =
+        (typeof userMeta?.full_name === "string" && userMeta.full_name) ||
+        (typeof userMeta?.name === "string" && userMeta.name) ||
+        (typeof userMeta?.preferred_username === "string" && userMeta.preferred_username) ||
+        data.user.email?.split("@")[0] ||
+        "User"
+
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", data.user.id)
+        .maybeSingle()
+
+      if (isOAuthLogin) {
+        await supabase.from("profiles").upsert({
           id: data.user.id,
           email: data.user.email,
-          display_name:
-            data.user.user_metadata?.full_name || data.user.user_metadata?.name || data.user.email?.split("@")[0],
-          role: "student",
+          display_name: identityDisplayName,
+          role: normalizeRole(profile?.role) || "student",
+          updated_at: new Date().toISOString(),
         })
-        return NextResponse.redirect(`${origin}/student/dashboard`)
+
+        return NextResponse.redirect(`${origin}/auth/select-role`)
       }
 
-      const role = profile.role || "student"
-      if (role === "admin") {
-        return NextResponse.redirect(`${origin}/admin/dashboard`)
-      } else if (role === "adviser") {
-        return NextResponse.redirect(`${origin}/adviser/dashboard`)
-      } else {
-        return NextResponse.redirect(`${origin}/student/dashboard`)
-      }
+      const role = normalizeRole(profile?.role) || "student"
+      if (role === "admin") return NextResponse.redirect(`${origin}/admin/dashboard`)
+      if (role === "adviser") return NextResponse.redirect(`${origin}/adviser/dashboard`)
+      return NextResponse.redirect(`${origin}/student/dashboard`)
     }
   }
 

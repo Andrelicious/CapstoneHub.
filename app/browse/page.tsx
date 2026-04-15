@@ -13,8 +13,18 @@ interface BrowseDatasetRow {
   school_year: string | null
   category: string | null
   tags: string[] | null
+  file_name?: string | null
+  mime_type?: string | null
   status: string
   created_at: string
+}
+
+interface OcrRow {
+  dataset_id?: string | null
+  submission_id?: string | null
+  title?: string | null
+  title_hint?: string | null
+  abstract_text?: string | null
 }
 
 interface BrowseDataset {
@@ -29,10 +39,29 @@ interface BrowseDataset {
   tags: string[] | null
   file_path: string | null
   file_name: string | null
+  mime_type: string | null
   status: string
   created_at: string
   approved_at: string | null
   profiles?: { display_name: string; id: string }
+}
+
+function hasMissingColumnError(message: string, column: string) {
+  const normalized = message.toLowerCase()
+  return (
+    normalized.includes(`column "${column}" does not exist`) ||
+    normalized.includes(`column ${column} does not exist`) ||
+    normalized.includes(`column datasets.${column} does not exist`) ||
+    normalized.includes(`column ocr_results.${column} does not exist`)
+  )
+}
+
+function hasMissingTableError(message: string, table: string) {
+  const normalized = (message || '').toLowerCase()
+  return (
+    normalized.includes(`relation "${table}" does not exist`) ||
+    normalized.includes(`could not find the table '${table}'`)
+  )
 }
 
 export default async function BrowsePage() {
@@ -41,13 +70,70 @@ export default async function BrowsePage() {
     ? await createSupabaseServerClient({ supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY })
     : supabase
 
-  const { data: datasets } = await dataClient
+  let datasetsQuery = await dataClient
     .from("datasets")
-    .select("id, title, description, user_id, program, doc_type, school_year, category, tags, status, created_at")
+    .select("id, title, description, user_id, program, doc_type, school_year, category, tags, file_name, mime_type, status, created_at")
     .eq("status", "approved")
     .order("created_at", { ascending: false })
 
+  if (datasetsQuery.error) {
+    const message = datasetsQuery.error.message || ""
+    const hasFileNameMissing = hasMissingColumnError(message, "file_name")
+    const hasMimeTypeMissing = hasMissingColumnError(message, "mime_type")
+
+    if (hasFileNameMissing || hasMimeTypeMissing) {
+      datasetsQuery = await dataClient
+        .from("datasets")
+        .select("id, title, description, user_id, program, doc_type, school_year, category, tags, status, created_at")
+        .eq("status", "approved")
+        .order("created_at", { ascending: false })
+    }
+  }
+
+  const datasets = datasetsQuery.data
+
   const baseDatasets = (datasets || []) as BrowseDatasetRow[]
+
+  const datasetIds = baseDatasets.map((d) => d.id)
+  let ocrMap: Record<string, OcrRow> = {}
+
+  if (datasetIds.length > 0) {
+    let ocrRead = await dataClient
+      .from('ocr_results')
+      .select('dataset_id, title, title_hint, abstract_text')
+      .in('dataset_id', datasetIds)
+
+    if (ocrRead.error && hasMissingColumnError(ocrRead.error.message || '', 'title')) {
+      ocrRead = await dataClient
+        .from('ocr_results')
+        .select('dataset_id, title_hint, abstract_text')
+        .in('dataset_id', datasetIds)
+    }
+
+    if (ocrRead.error && hasMissingColumnError(ocrRead.error.message || '', 'dataset_id')) {
+      ocrRead = await dataClient
+        .from('ocr_results')
+        .select('submission_id, title, title_hint, abstract_text')
+        .in('submission_id', datasetIds)
+
+      if (ocrRead.error && hasMissingColumnError(ocrRead.error.message || '', 'title')) {
+        ocrRead = await dataClient
+          .from('ocr_results')
+          .select('submission_id, title_hint, abstract_text')
+          .in('submission_id', datasetIds)
+      }
+    }
+
+    if (!ocrRead.error) {
+      ocrMap = Object.fromEntries(
+        ((ocrRead.data || []) as OcrRow[])
+          .map((row) => [row.dataset_id || row.submission_id || '', row])
+          .filter(([id]) => Boolean(id))
+      )
+    } else if (!hasMissingTableError(ocrRead.error.message || '', 'ocr_results')) {
+      throw new Error(`Failed to load OCR results for browse: ${ocrRead.error.message}`)
+    }
+  }
 
   const userIds = Array.from(new Set(baseDatasets.map((d) => d.user_id).filter(Boolean)))
   let profileMap: Record<string, { display_name: string; id: string }> = {}
@@ -65,8 +151,8 @@ export default async function BrowsePage() {
 
   const initialCapstones: BrowseDataset[] = baseDatasets.map((dataset) => ({
     id: dataset.id,
-    title: dataset.title || "Untitled",
-    description: dataset.description,
+    title: ((ocrMap[dataset.id]?.title || ocrMap[dataset.id]?.title_hint || '').trim() || dataset.title || 'Untitled'),
+    description: ((ocrMap[dataset.id]?.abstract_text || '').trim() || dataset.description || null),
     user_id: dataset.user_id,
     program: dataset.program,
     doc_type: dataset.doc_type,
@@ -74,7 +160,8 @@ export default async function BrowsePage() {
     category: dataset.category,
     tags: dataset.tags,
     file_path: `/api/datasets/${dataset.id}/download`,
-    file_name: `${(dataset.title || 'document').replace(/\s+/g, '_')}.pdf`,
+    file_name: dataset.file_name || `${(dataset.title || 'document').replace(/\s+/g, '_')}.pdf`,
+    mime_type: dataset.mime_type || null,
     status: dataset.status,
     created_at: dataset.created_at,
     approved_at: null,

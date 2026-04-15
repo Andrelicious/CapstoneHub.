@@ -2,14 +2,13 @@
 
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { OCRStatusBadge } from '@/components/ocr-status-badge'
-import { Eye, Edit2, RotateCcw, FileText } from 'lucide-react'
+import { Eye, Edit2, FileText } from 'lucide-react'
 import Link from 'next/link'
 
 interface Submission {
   id: string
   title: string
-  status: 'draft' | 'ocr_processing' | 'pending_review' | 'returned' | 'approved' | 'rejected'
+  status: 'draft' | 'ocr_processing' | 'pending_admin_review' | 'approved' | 'rejected'
   document: string
   submittedAt: string
   adminRemarks?: string
@@ -26,14 +25,14 @@ const mockSubmissions: Submission[] = [
   {
     id: '2',
     title: 'Sustainable Data Processing Architecture',
-    status: 'pending_review',
+    status: 'pending_admin_review',
     document: 'capstone-thesis-v2.pdf',
     submittedAt: '2024-02-08',
   },
   {
     id: '3',
     title: 'Machine Learning for Climate Prediction',
-    status: 'returned',
+    status: 'rejected',
     document: 'ml-climate.pdf',
     submittedAt: '2024-02-01',
     adminRemarks: 'Please update the references section and resubmit.',
@@ -50,8 +49,7 @@ const mockSubmissions: Submission[] = [
 const statusConfig = {
   draft: { color: 'bg-gray-500/20 text-gray-300 border-gray-500/30', label: 'Draft' },
   ocr_processing: { color: 'bg-blue-500/20 text-blue-300 border-blue-500/30', label: 'OCR Processing' },
-  pending_review: { color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30', label: 'Pending Review' },
-  returned: { color: 'bg-orange-500/20 text-orange-300 border-orange-500/30', label: 'Returned' },
+  pending_admin_review: { color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30', label: 'Pending Admin Review' },
   approved: { color: 'bg-green-500/20 text-green-300 border-green-500/30', label: 'Approved' },
   rejected: { color: 'bg-red-500/20 text-red-300 border-red-500/30', label: 'Rejected' },
 }
@@ -60,7 +58,6 @@ export function StudentSubmissionsDashboard() {
   const stats = {
     total: mockSubmissions.length,
     processing: mockSubmissions.filter((s) => s.status === 'ocr_processing').length,
-    returned: mockSubmissions.filter((s) => s.status === 'returned').length,
     approved: mockSubmissions.filter((s) => s.status === 'approved').length,
     rejected: mockSubmissions.filter((s) => s.status === 'rejected').length,
   }
@@ -76,10 +73,6 @@ export function StudentSubmissionsDashboard() {
         <Card className="bg-blue-500/10 border-blue-500/20 p-4">
           <p className="text-xs text-blue-300 uppercase tracking-wider">Processing</p>
           <p className="text-2xl font-bold text-blue-300 mt-2">{stats.processing}</p>
-        </Card>
-        <Card className="bg-orange-500/10 border-orange-500/20 p-4">
-          <p className="text-xs text-orange-300 uppercase tracking-wider">Returned</p>
-          <p className="text-2xl font-bold text-orange-300 mt-2">{stats.returned}</p>
         </Card>
         <Card className="bg-green-500/10 border-green-500/20 p-4">
           <p className="text-xs text-green-300 uppercase tracking-wider">Approved</p>
@@ -153,16 +146,6 @@ export function StudentSubmissionsDashboard() {
                       </Button>
                     )}
 
-                    {submission.status === 'returned' && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="border-white/20 text-gray-300 hover:bg-white/10 gap-2 bg-transparent"
-                      >
-                        <RotateCcw className="w-4 h-4" />
-                        Resubmit
-                      </Button>
-                    )}
                   </div>
                 </div>
 

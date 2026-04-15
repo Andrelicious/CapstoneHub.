@@ -8,6 +8,7 @@ import { supabaseBrowser } from "@/lib/supabase/browser"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 import ProfilePanel from "@/components/profile-panel"
 import { NotificationDropdown } from "@/components/notification-dropdown"
+import BrandLogo from "@/components/brand-logo"
 
 interface UserProfile {
   display_name: string | null
@@ -23,6 +24,7 @@ export default function Navbar() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const pathname = usePathname()
+  const normalizedRole = (profile?.role || "student").toLowerCase()
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20)
@@ -34,33 +36,42 @@ export default function Navbar() {
   useEffect(() => {
     const supabase = supabaseBrowser()
 
-    // Check session immediately (sync from storage if available)
+    const fetchProfile = async (sessionUser: SupabaseUser) => {
+      try {
+        const response = await fetch("/api/get-profile")
+        if (response.ok) {
+          const { profile: apiProfile } = await response.json()
+          setProfile({
+            display_name: apiProfile?.display_name || sessionUser.email?.split("@")[0] || "User",
+            email: apiProfile?.email || sessionUser.email || null,
+            role: typeof apiProfile?.role === "string" ? apiProfile.role.toLowerCase() : "student",
+            avatar_url: apiProfile?.avatar_url || null,
+          })
+          return
+        }
+      } catch {}
+
+      setProfile({
+        display_name: sessionUser.email?.split("@")[0] || "User",
+        email: sessionUser.email || null,
+        role: "student",
+        avatar_url: null,
+      })
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
         setUser(session.user)
-        // Set profile from user metadata (avoid RLS issues)
-        setProfile({
-          display_name: session.user.user_metadata?.display_name || session.user.email?.split("@")[0] || "User",
-          email: session.user.email || null,
-          role: session.user.user_metadata?.role || "student",
-          avatar_url: session.user.user_metadata?.avatar_url || null,
-        })
+        void fetchProfile(session.user)
       }
     })
 
-    // Listen for auth changes
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setUser(session.user)
-        // Use user metadata only (avoid RLS infinite recursion on profiles table)
-        setProfile({
-          display_name: session.user.user_metadata?.display_name || session.user.email?.split("@")[0] || "User",
-          email: session.user.email || null,
-          role: session.user.user_metadata?.role || "student",
-          avatar_url: session.user.user_metadata?.avatar_url || null,
-        })
+        void fetchProfile(session.user)
       } else {
         setUser(null)
         setProfile(null)
@@ -85,8 +96,8 @@ export default function Navbar() {
   }
 
   const getDashboardUrl = () => {
-    if (profile?.role === "adviser") return "/adviser/dashboard"
-    if (profile?.role === "admin") return "/admin/dashboard"
+    if (normalizedRole === "adviser") return "/adviser/dashboard"
+    if (normalizedRole === "admin") return "/admin/dashboard"
     return "/student/dashboard"
   }
 
@@ -104,7 +115,7 @@ export default function Navbar() {
     items.push({ name: "Browse", href: "/browse" })
 
     // Student-specific: Submit button (only one entry point)
-    if (profile?.role === "student") {
+    if (normalizedRole === "student") {
       items.push({ name: "Submit", href: "/submit" })
     }
 
@@ -117,23 +128,14 @@ export default function Navbar() {
     <>
       <nav
         className={`fixed top-0 left-0 right-0 z-40 transition-all duration-500 ${
-          scrolled ? "glass border-b border-white/10" : "bg-transparent"
+          scrolled ? "glass border-b border-border" : "bg-transparent"
         }`}
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="flex items-center justify-between h-20">
             {/* Logo */}
             <a href={isAuthenticated ? getDashboardUrl() : "/"} className="flex items-center gap-3">
-              <div className="relative w-10 h-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-400 rounded-lg rotate-45 transform" />
-                <div className="absolute inset-1 bg-[#0a0612] rounded-md rotate-45 transform" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">C</span>
-                </div>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-white via-purple-200 to-cyan-200 bg-clip-text text-transparent">
-                Capstone Hub
-              </span>
+              <BrandLogo className="h-14 w-14 md:h-16 md:w-16" fit="contain" />
             </a>
 
             {/* Center Nav Items - Desktop */}
@@ -143,7 +145,7 @@ export default function Navbar() {
                   key={item.name}
                   href={item.href}
                   className={`transition-colors duration-300 text-sm font-medium relative group ${
-                    pathname === item.href ? "text-white" : "text-gray-300 hover:text-white"
+                    pathname === item.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
                   {item.name}
@@ -160,20 +162,20 @@ export default function Navbar() {
             <div className="hidden md:flex items-center gap-3">
               {isAuthenticated ? (
                 <>
-                  {profile?.role === "student" && (
+                  {normalizedRole === "student" && (
                     <a href="/submit">
-                      <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10 gap-2">
+                      <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-accent gap-2">
                         <Upload className="w-4 h-4" />
                         Submit
                       </Button>
                     </a>
                   )}
 
-                  <NotificationDropdown userId={user!.id} userRole={profile?.role || "student"} />
+                  <NotificationDropdown userId={user!.id} userRole={normalizedRole} />
 
                   <button
                     onClick={() => setProfilePanelOpen(true)}
-                    className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-white/10 transition-colors"
+                    className="flex items-center gap-2 px-2 py-1 rounded-full hover:bg-accent transition-colors"
                   >
                     <div className="w-9 h-9 rounded-full bg-gradient-to-br from-purple-500 to-cyan-500 flex items-center justify-center text-white text-sm font-semibold shadow-lg shadow-purple-500/20">
                       {profile?.avatar_url ? (
@@ -191,7 +193,7 @@ export default function Navbar() {
               ) : (
                 <>
                   <a href="/login">
-                    <Button variant="ghost" className="text-gray-300 hover:text-white hover:bg-white/10">
+                    <Button variant="ghost" className="text-muted-foreground hover:text-foreground hover:bg-accent">
                       Login
                     </Button>
                   </a>
@@ -205,21 +207,21 @@ export default function Navbar() {
             </div>
 
             {/* Mobile Menu Button */}
-            <button className="md:hidden text-white p-2" onClick={() => setMobileOpen(!mobileOpen)}>
+            <button className="md:hidden text-foreground p-2" onClick={() => setMobileOpen(!mobileOpen)}>
               {mobileOpen ? <X size={24} /> : <Menu size={24} />}
             </button>
           </div>
 
           {/* Mobile Menu */}
           {mobileOpen && (
-            <div className="md:hidden glass border-t border-white/10 py-4 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="md:hidden glass border-t border-border py-4 animate-in fade-in slide-in-from-top-2 duration-300">
               <div className="flex flex-col gap-4">
                 {navItems.map((item) => (
                   <a
                     key={item.name}
                     href={item.href}
                     className={`transition-colors px-4 py-2 ${
-                      pathname === item.href ? "text-white" : "text-gray-300 hover:text-white"
+                      pathname === item.href ? "text-foreground" : "text-muted-foreground hover:text-foreground"
                     }`}
                     onClick={() => setMobileOpen(false)}
                   >
@@ -229,7 +231,7 @@ export default function Navbar() {
 
                 {isAuthenticated && (
                   <>
-                    <div className="px-4 py-3 border-t border-white/10">
+                    <div className="px-4 py-3 border-t border-border">
                       <button
                         onClick={() => {
                           setMobileOpen(false)
@@ -241,16 +243,16 @@ export default function Navbar() {
                           {getUserInitials()}
                         </div>
                         <div className="text-left">
-                          <p className="font-semibold text-white">{profile?.display_name || "User"}</p>
+                          <p className="font-semibold text-foreground">{profile?.display_name || "User"}</p>
                           <p className="text-xs text-purple-400 capitalize">{profile?.role || "Student"}</p>
                         </div>
                       </button>
                     </div>
 
-                    {profile?.role === "student" && (
+                    {normalizedRole === "student" && (
                       <a
                         href="/submit"
-                        className="text-gray-300 hover:text-white transition-colors px-4 py-2 flex items-center gap-2"
+                        className="text-muted-foreground hover:text-foreground transition-colors px-4 py-2 flex items-center gap-2"
                         onClick={() => setMobileOpen(false)}
                       >
                         <Upload className="w-4 h-4" />
@@ -259,7 +261,7 @@ export default function Navbar() {
                     )}
                     <a
                       href={getDashboardUrl()}
-                      className="text-gray-300 hover:text-white transition-colors px-4 py-2"
+                      className="text-muted-foreground hover:text-foreground transition-colors px-4 py-2"
                       onClick={() => setMobileOpen(false)}
                     >
                       Dashboard
@@ -267,11 +269,11 @@ export default function Navbar() {
                   </>
                 )}
 
-                <div className="flex gap-4 px-4 pt-4 border-t border-white/10">
+                <div className="flex gap-4 px-4 pt-4 border-t border-border">
                   {!isAuthenticated && (
                     <>
                       <a href="/login" className="flex-1">
-                        <Button variant="ghost" className="w-full text-gray-300">
+                        <Button variant="ghost" className="w-full text-muted-foreground hover:text-foreground">
                           Login
                         </Button>
                       </a>

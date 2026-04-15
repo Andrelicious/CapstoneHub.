@@ -51,9 +51,10 @@ export default function ForgotPasswordPage() {
             <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
               <Mail className="w-8 h-8 text-primary" />
             </div>
-            <h1 className="text-2xl font-bold text-foreground mb-2">Forgot Password?</h1>
+            <p className="text-xs font-semibold tracking-[0.2em] text-cyan-500 uppercase mb-2">Account Recovery</p>
+            <h1 className="text-2xl font-bold text-foreground mb-2">Restore Account Access</h1>
             <p className="text-sm text-muted-foreground">
-              Enter your email and we'll send you a link to reset your password
+              Enter your registered email and we&apos;ll send a secure reset link.
             </p>
           </div>
 
@@ -86,7 +87,7 @@ export default function ForgotPasswordPage() {
             </div>
 
             <Button type="submit" disabled={loading} className="w-full h-12 text-base">
-              {loading ? "Sending..." : "Send Reset Link"}
+              {loading ? "Sending secure link..." : "Send Secure Reset Link"}
             </Button>
           </form>
 
@@ -97,7 +98,7 @@ export default function ForgotPasswordPage() {
               className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               <ArrowLeft className="w-4 h-4" />
-              Back to Login
+              Back to Sign In
             </a>
           </div>
         </div>

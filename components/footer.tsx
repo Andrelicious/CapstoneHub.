@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabaseBrowser } from "@/lib/supabase/browser"
+import BrandLogo from "@/components/brand-logo"
 
 export default function Footer() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -16,8 +17,17 @@ export default function Footer() {
       } = await supabase.auth.getSession()
       if (session?.user) {
         setIsAuthenticated(true)
-        // Use user metadata to avoid RLS infinite recursion on profiles table
-        setRole(session.user.user_metadata?.role || "student")
+        try {
+          const response = await fetch('/api/get-profile')
+          if (response.ok) {
+            const { profile } = await response.json()
+            setRole(typeof profile?.role === 'string' ? profile.role.toLowerCase() : 'student')
+          } else {
+            setRole('student')
+          }
+        } catch {
+          setRole('student')
+        }
       } else {
         setIsAuthenticated(false)
         setRole(null)
@@ -53,16 +63,7 @@ export default function Footer() {
           {/* About */}
           <div>
             <div className="flex items-center gap-3 mb-6">
-              <div className="relative w-10 h-10">
-                <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-400 rounded-lg rotate-45 transform" />
-                <div className="absolute inset-1 bg-[#0a0612] rounded-md rotate-45 transform" />
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">C</span>
-                </div>
-              </div>
-              <span className="text-xl font-bold bg-gradient-to-r from-white via-purple-200 to-cyan-200 bg-clip-text text-transparent">
-                Capstone Hub
-              </span>
+              <BrandLogo className="h-20 w-20 md:h-24 md:w-24" fit="cover" />
             </div>
             <p className="text-gray-400 max-w-md leading-relaxed">
               A central repository for the College of Computer Studies, preserving and showcasing student capstone

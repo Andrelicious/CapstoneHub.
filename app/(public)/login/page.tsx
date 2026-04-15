@@ -15,14 +15,15 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [keepSignedIn, setKeepSignedIn] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const resolveRoleAndRedirect = async () => {
-    const response = await fetch('/api/get-profile', { method: 'GET' })
+    const response = await fetch('/api/get-profile?ensure=false', { method: 'GET' })
     if (response.ok) {
       const { profile } = await response.json()
-      const role = (profile?.role || 'student').toLowerCase()
+      const role = (profile?.role || '').toLowerCase()
       if (role === 'admin') {
         window.location.href = '/admin/dashboard'
         return
@@ -31,14 +32,20 @@ export default function LoginPage() {
         window.location.href = '/adviser/dashboard'
         return
       }
+      if (role === 'student') {
+        window.location.href = '/student/dashboard'
+        return
+      }
+      window.location.href = '/auth/select-role'
+      return
     }
-    window.location.href = '/student/dashboard'
+    window.location.href = '/login'
   }
 
   // Check if already logged in and redirect to dashboard
   useEffect(() => {
     try {
-      const supabase = supabaseBrowser()
+      const supabase = supabaseBrowser({ rememberSession: keepSignedIn })
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
           resolveRoleAndRedirect()
@@ -57,7 +64,7 @@ export default function LoginPage() {
     setLoading(true)
 
     try {
-      const supabase = supabaseBrowser()
+      const supabase = supabaseBrowser({ rememberSession: keepSignedIn })
 
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -110,11 +117,12 @@ export default function LoginPage() {
 
   return (
     <AuthLayout>
-      <div className="bg-[#1a1425]/90 backdrop-blur-xl rounded-2xl p-8 border border-white/10 shadow-2xl shadow-purple-500/10">
+      <div className="bg-card/90 backdrop-blur-xl rounded-2xl p-8 border border-border shadow-2xl shadow-purple-500/10">
         {/* Header */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white mb-2">Welcome Back</h1>
-          <p className="text-gray-400">Sign in to access your capstone projects</p>
+          <p className="text-xs font-semibold tracking-[0.2em] text-cyan-500 uppercase mb-2">Secure Research Access</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Welcome Back to Capstone Hub</h1>
+          <p className="text-muted-foreground">Sign in to continue managing high-impact capstone and thesis research.</p>
         </div>
 
         {/* Form */}
@@ -124,7 +132,7 @@ export default function LoginPage() {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor="email" className="text-gray-300">
+            <Label htmlFor="email" className="text-foreground">
               Email Address
             </Label>
             <div className="relative">
@@ -138,13 +146,13 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 disabled={loading}
-                className="pl-10 bg-[#0a0612] border-white/10 focus:border-purple-500 focus:ring-purple-500/20 text-white placeholder:text-gray-500 h-12"
+                className="pl-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
             </div>
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password" className="text-gray-300">
+            <Label htmlFor="password" className="text-foreground">
               Password
             </Label>
             <div className="relative">
@@ -158,12 +166,13 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 disabled={loading}
-                className="pl-10 pr-10 bg-[#0a0612] border-white/10 focus:border-purple-500 focus:ring-purple-500/20 text-white placeholder:text-gray-500 h-12"
+                className="pl-10 pr-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-white transition-colors"
+                suppressHydrationWarning
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-foreground transition-colors"
               >
                 {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
               </button>
@@ -174,12 +183,16 @@ export default function LoginPage() {
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
-                className="w-4 h-4 rounded border-white/20 bg-[#0a0612] text-purple-500 focus:ring-purple-500/20"
+                checked={keepSignedIn}
+                onChange={(e) => setKeepSignedIn(e.target.checked)}
+                disabled={loading}
+                suppressHydrationWarning
+                className="w-4 h-4 rounded border-border bg-background text-purple-500 focus:ring-purple-500/20"
               />
-              <span className="text-sm text-gray-400">Remember me</span>
+              <span className="text-sm text-muted-foreground">Keep me signed in</span>
             </label>
             <Link href="/forgot-password" className="text-sm text-purple-400 hover:text-purple-300 transition-colors">
-              Forgot password?
+              Recover access
             </Link>
           </div>
 
@@ -195,7 +208,7 @@ export default function LoginPage() {
               </>
             ) : (
               <>
-                Sign In
+                Access Workspace
                 <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
               </>
             )}
@@ -205,10 +218,10 @@ export default function LoginPage() {
         {/* Divider */}
         <div className="relative my-8">
           <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-white/10" />
+            <div className="w-full border-t border-border" />
           </div>
           <div className="relative flex justify-center text-sm">
-            <span className="px-4 bg-[#1a1425] text-gray-400">or continue with</span>
+            <span className="px-4 bg-card text-muted-foreground">or authenticate with</span>
           </div>
         </div>
 
@@ -218,7 +231,7 @@ export default function LoginPage() {
             variant="outline"
             disabled={loading}
             onClick={() => handleOAuthLogin("google")}
-            className="h-12 bg-[#0a0612] border-white/10 hover:bg-white/10 hover:border-white/20 text-white"
+            className="h-12 bg-background border-border hover:bg-accent hover:border-border text-foreground"
           >
             <svg className="w-5 h-5 mr-2" viewBox="0 0 24 24">
               <path
@@ -245,20 +258,20 @@ export default function LoginPage() {
             variant="outline"
             disabled={loading}
             onClick={() => handleOAuthLogin("github")}
-            className="h-12 bg-[#0a0612] border-white/10 hover:bg-white/10 hover:border-white/20 text-white"
+            className="h-12 bg-background border-border hover:bg-accent hover:border-border text-foreground"
           >
             <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 24 24">
-              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-6.627-5.373-12-12-12z" />
+              <path d="M12 0C5.37 0 0 5.373 0 12c0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.108-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.536-1.524.117-3.176 0 0 1.008-.322 3.301 1.23a11.49 11.49 0 0 1 3.003-.404c1.018.005 2.043.138 3.003.404 2.292-1.552 3.298-1.23 3.298-1.23.655 1.653.244 2.874.12 3.176.77.84 1.235 1.91 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576C20.565 21.796 24 17.299 24 12c0-6.627-5.373-12-12-12z" />
             </svg>
             GitHub
           </Button>
         </div>
 
         {/* Sign up link */}
-        <p className="text-center mt-8 text-gray-400">
-          Don&apos;t have an account?{" "}
+        <p className="text-center mt-8 text-muted-foreground">
+          New to Capstone Hub?{" "}
           <Link href="/register" className="text-purple-400 hover:text-purple-300 font-medium transition-colors">
-            Create one
+            Create your workspace
           </Link>
         </p>
       </div>

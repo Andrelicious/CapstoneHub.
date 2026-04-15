@@ -64,7 +64,7 @@ export async function updateSession(request: NextRequest) {
     !request.nextUrl.pathname.startsWith("/reset-password") &&
     request.nextUrl.pathname !== "/" &&
     (request.nextUrl.pathname.startsWith("/dashboard") ||
-      request.nextUrl.pathname.startsWith("/upload") ||
+      request.nextUrl.pathname.startsWith("/submit") ||
       request.nextUrl.pathname.startsWith("/student") ||
       request.nextUrl.pathname.startsWith("/adviser") ||
       request.nextUrl.pathname.startsWith("/admin") ||

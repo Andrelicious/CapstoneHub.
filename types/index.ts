@@ -13,7 +13,7 @@ export interface Profile {
   organization?: string
   bio?: string
   avatar_url?: string
-  created_at: string
+  ficreated_at: string
   updated_at?: string
 }
 
@@ -74,4 +74,32 @@ export interface AdminStats extends DashboardStats {
   total_users: number
   total_students: number
   total_advisers: number
+}
+
+export type ResearchGroupMemberRole = 'leader' | 'member'
+
+export interface ResearchGroupInvite {
+  id: string
+  email: string
+  invited_by: string
+  created_at: string
+}
+
+export interface ResearchGroupMember {
+  id: string
+  display_name: string
+  email: string
+  member_role: ResearchGroupMemberRole
+}
+
+export interface ResearchGroup {
+  id: string
+  name: string
+  description?: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  current_user_role: ResearchGroupMemberRole
+  members: ResearchGroupMember[]
+  pending_invites?: ResearchGroupInvite[]
 }

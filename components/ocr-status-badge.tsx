@@ -36,12 +36,13 @@ export function OCRStatusBadge({ status, className = '' }: OCRStatusBadgeProps) 
 
   const config = statusConfig[status]
   const Icon = config.icon
+  const shouldAnimate = status === 'processing'
 
   return (
     <div
       className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium ${config.color} ${className}`}
     >
-      <Icon className={`w-4 h-4 ${config.animate ? 'animate-spin' : ''}`} />
+      <Icon className={`w-4 h-4 ${shouldAnimate ? 'animate-spin' : ''}`} />
       <span>{config.label}</span>
     </div>
   )

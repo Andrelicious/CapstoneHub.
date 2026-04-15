@@ -2,10 +2,11 @@
 
 import type { ReactNode } from "react"
 import Link from "next/link"
+import BrandLogo from "@/components/brand-logo"
 
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#0a0612] relative overflow-hidden flex items-center justify-center">
+    <div className="min-h-screen bg-background relative overflow-hidden flex items-center justify-center">
       {/* Background effects - darker, more subtle */}
       <div className="absolute inset-0 overflow-hidden">
         <div className="absolute top-1/4 -left-32 w-96 h-96 bg-purple-600/20 rounded-full blur-[120px] animate-pulse-glow" />
@@ -28,16 +29,7 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
 
       {/* Logo */}
       <Link href="/" className="absolute top-8 left-8 flex items-center gap-3 z-10">
-        <div className="relative w-10 h-10">
-          <div className="absolute inset-0 bg-gradient-to-br from-purple-500 via-blue-500 to-cyan-400 rounded-lg rotate-45 transform" />
-          <div className="absolute inset-1 bg-[#0a0612] rounded-md rotate-45 transform" />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-white font-bold text-lg">C</span>
-          </div>
-        </div>
-        <span className="text-xl font-bold bg-gradient-to-r from-white via-purple-200 to-cyan-200 bg-clip-text text-transparent">
-          Capstone Hub
-        </span>
+        <BrandLogo className="h-16 w-16 md:h-20 md:w-20" fit="cover" />
       </Link>
 
       {/* Content */}

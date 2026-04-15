@@ -4,7 +4,7 @@ import Footer from "@/components/footer"
 
 export default function AppLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="min-h-screen bg-[#0a0612]">
+    <div className="min-h-screen bg-background text-foreground">
       <Navbar />
       <main className="flex-1">{children}</main>
       <Footer />

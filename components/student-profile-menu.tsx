@@ -30,12 +30,26 @@ export function StudentProfileMenu() {
         return
       }
 
-      // Use user metadata to avoid RLS infinite recursion on profiles table
+      try {
+        const response = await fetch('/api/get-profile')
+        if (response.ok) {
+          const { profile: apiProfile } = await response.json()
+          setProfile({
+            id: user.id,
+            display_name: apiProfile?.display_name || user.email?.split("@")[0] || "User",
+            email: apiProfile?.email || user.email || "",
+            role: typeof apiProfile?.role === 'string' ? apiProfile.role.toLowerCase() : 'student',
+          })
+          setLoading(false)
+          return
+        }
+      } catch {}
+
       setProfile({
         id: user.id,
-        display_name: user.user_metadata?.display_name || user.email?.split("@")[0] || "User",
+        display_name: user.email?.split("@")[0] || "User",
         email: user.email || "",
-        role: user.user_metadata?.role || "student",
+        role: "student",
       })
       setLoading(false)
     }

@@ -32,14 +32,6 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
           return
         }
 
-        const roleFromMetadata =
-          typeof user.user_metadata?.role === 'string' ? user.user_metadata.role.toLowerCase() : null
-        if (roleFromMetadata) {
-          setRole(roleFromMetadata)
-          setLoading(false)
-          return
-        }
-
         try {
           const response = await fetch('/api/get-profile', { method: 'GET' })
           if (response.ok) {

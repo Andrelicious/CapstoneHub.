@@ -22,18 +22,7 @@ export default function DashboardRedirect() {
         return
       }
 
-      const metadataRole = typeof user.user_metadata?.role === "string" ? user.user_metadata.role.toLowerCase() : null
-
-      if (metadataRole === "admin") {
-        router.replace("/admin/dashboard")
-        return
-      }
-      if (metadataRole === "adviser") {
-        router.replace("/adviser/dashboard")
-        return
-      }
-
-      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).single()
+      const { data: profile } = await supabase.from("profiles").select("role").eq("id", user.id).maybeSingle()
       const role = typeof profile?.role === "string" ? profile.role.toLowerCase() : "student"
 
       if (role === "admin") {
@@ -49,10 +38,10 @@ export default function DashboardRedirect() {
   }, [router])
 
   return (
-    <div className="min-h-screen bg-[#0a0612] flex items-center justify-center">
+    <div className="min-h-screen bg-background flex items-center justify-center">
       <div className="text-center">
-        <Loader2 className="w-8 h-8 text-purple-500 animate-spin mx-auto mb-4" />
-        <p className="text-gray-400">Loading your dashboard...</p>
+        <Loader2 className="w-8 h-8 text-primary animate-spin mx-auto mb-4" />
+        <p className="text-muted-foreground">Loading your dashboard...</p>
       </div>
     </div>
   )

@@ -4,6 +4,7 @@ import { Inter } from "next/font/google"
 import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 import { Toaster } from "@/components/ui/toaster"
+import { ThemeProvider } from "@/components/theme-provider"
 
 const inter = Inter({ subsets: ["latin"] })
 
@@ -22,11 +23,13 @@ export default function RootLayout({
   const shouldLoadAnalytics = process.env.VERCEL === '1'
 
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationWarning>
       <body className={`${inter.className} antialiased bg-background min-h-screen`}>
-        {children}
-        <Toaster />
-        {shouldLoadAnalytics ? <Analytics /> : null}
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          {children}
+          <Toaster />
+          {shouldLoadAnalytics ? <Analytics /> : null}
+        </ThemeProvider>
       </body>
     </html>
   )

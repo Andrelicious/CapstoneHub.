@@ -10,7 +10,6 @@ const statusLabel: Record<string, string> = {
   draft: 'Draft',
   ocr_processing: 'OCR Processing',
   pending_admin_review: 'Pending Admin Review',
-  returned: 'Returned',
   approved: 'Approved',
   rejected: 'Rejected',
 }
@@ -50,40 +49,40 @@ export default async function SubmissionDetailPage({ params }: { params: Promise
       <main className="relative pt-32 pb-20">
         <div className="max-w-4xl mx-auto px-6 lg:px-8">
           <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-            <h1 className="text-3xl md:text-4xl font-bold text-white">Submission Details</h1>
-            <Badge className="bg-white/10 text-white border-white/20">
+            <h1 className="text-3xl md:text-4xl font-bold text-foreground">Submission Details</h1>
+            <Badge className="bg-accent text-foreground border-border">
               {statusLabel[dataset.status] || dataset.status}
             </Badge>
           </div>
 
-          <div className="rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6 space-y-5">
+          <div className="rounded-2xl bg-card border border-border p-6 space-y-5">
             <div>
-              <p className="text-sm text-gray-400 mb-1">Title</p>
-              <p className="text-white text-lg font-medium">{dataset.title || 'Untitled submission'}</p>
+              <p className="text-sm text-muted-foreground mb-1">Title</p>
+              <p className="text-foreground text-lg font-medium">{dataset.title || 'Untitled submission'}</p>
             </div>
 
             <div className="grid sm:grid-cols-2 gap-4">
               <div>
-                <p className="text-sm text-gray-400 mb-1">Program</p>
-                <p className="text-white">{dataset.program || '—'}</p>
+                <p className="text-sm text-muted-foreground mb-1">Program</p>
+                <p className="text-foreground">{dataset.program || '—'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-400 mb-1">School Year</p>
-                <p className="text-white">{dataset.school_year || '—'}</p>
+                <p className="text-sm text-muted-foreground mb-1">School Year</p>
+                <p className="text-foreground">{dataset.school_year || '—'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-400 mb-1">Document Type</p>
-                <p className="text-white">{dataset.doc_type || '—'}</p>
+                <p className="text-sm text-muted-foreground mb-1">Document Type</p>
+                <p className="text-foreground">{dataset.doc_type || '—'}</p>
               </div>
               <div>
-                <p className="text-sm text-gray-400 mb-1">Created</p>
-                <p className="text-white">{new Date(dataset.created_at).toLocaleString()}</p>
+                <p className="text-sm text-muted-foreground mb-1">Created</p>
+                <p className="text-foreground">{new Date(dataset.created_at).toLocaleString()}</p>
               </div>
             </div>
 
             <div>
-              <p className="text-sm text-gray-400 mb-1">Description</p>
-              <p className="text-white whitespace-pre-wrap">{dataset.description || 'No description provided.'}</p>
+              <p className="text-sm text-muted-foreground mb-1">Description</p>
+              <p className="text-foreground whitespace-pre-wrap">{dataset.description || 'No description provided.'}</p>
             </div>
 
             {dataset.admin_remarks ? (
@@ -95,7 +94,7 @@ export default async function SubmissionDetailPage({ params }: { params: Promise
 
             <div className="flex flex-wrap gap-3 pt-2">
               <Link href="/student/dashboard">
-                <Button variant="outline" className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+                <Button variant="outline" className="bg-card border-border text-foreground hover:bg-accent">
                   Back to Dashboard
                 </Button>
               </Link>

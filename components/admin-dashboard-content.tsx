@@ -62,7 +62,7 @@ export default function AdminDashboardContent({
 
   const statCards = [
     { label: 'Total Projects', value: stats.total_datasets, icon: FileText, color: 'from-purple-500 to-purple-600' },
-    { label: 'Pending Review', value: stats.pending_review, icon: Clock, color: 'from-yellow-500 to-orange-500' },
+    { label: 'Pending Admin Review', value: stats.pending_review, icon: Clock, color: 'from-yellow-500 to-orange-500' },
     { label: 'Approved', value: stats.approved, icon: CheckCircle, color: 'from-green-500 to-emerald-500' },
     { label: 'Rejected', value: stats.rejected, icon: XCircle, color: 'from-red-500 to-rose-500' },
     { label: 'Total Users', value: stats.total_users, icon: Users, color: 'from-blue-500 to-blue-600' },
@@ -134,7 +134,7 @@ export default function AdminDashboardContent({
                   <div className="flex-1 text-left">
                     <h3 className="font-semibold text-white">Review Queue</h3>
                     <p className="text-sm text-gray-400">
-                      {stats.pending_review} submissions pending approval
+                      {stats.pending_review} submissions pending admin review
                     </p>
                   </div>
                   <TrendingUp className="w-5 h-5 text-gray-400 group-hover:text-cyan-400 transition-colors" />
@@ -152,7 +152,7 @@ export default function AdminDashboardContent({
                     <Clock className="w-5 h-5 text-yellow-400" />
                   </div>
                   <div>
-                    <CardTitle className="text-white">Pending Review</CardTitle>
+                    <CardTitle className="text-white">Pending Admin Review</CardTitle>
                     <p className="text-sm text-gray-400">
                       {pendingDatasets.length} submission{pendingDatasets.length !== 1 ? 's' : ''} awaiting approval
                     </p>
@@ -179,7 +179,7 @@ export default function AdminDashboardContent({
                           <div className="flex items-center gap-2 mb-2">
                             <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/30 hover:bg-yellow-500/30">
                               <Clock className="w-3 h-3 mr-1" />
-                              Pending
+                              Pending Admin Review
                             </Badge>
                             <span className="text-xs text-gray-400">
                               {new Date(dataset.created_at).toLocaleDateString()}

@@ -22,8 +22,15 @@ export default function HeroSection() {
         data: { session },
       } = await supabase.auth.getSession()
       if (session?.user) {
-        // Use user metadata to avoid RLS recursion issues
-        setUserRole(session.user.user_metadata?.role || "student")
+        try {
+          const response = await fetch('/api/get-profile')
+          if (response.ok) {
+            const { profile } = await response.json()
+            setUserRole(typeof profile?.role === 'string' ? profile.role.toLowerCase() : 'student')
+            return
+          }
+        } catch {}
+        setUserRole('student')
       }
     }
     checkUserRole()

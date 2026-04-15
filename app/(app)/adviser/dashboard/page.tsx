@@ -3,7 +3,7 @@ import { cookies } from "next/headers"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { BookOpen, Eye } from "lucide-react"
+import { BookOpen, Eye, FileCheck } from "lucide-react"
 
 export default async function AdviserDashboardPage() {
   const cookieStore = await cookies()
@@ -28,8 +28,7 @@ export default async function AdviserDashboardPage() {
   }
 
   // Check if user is adviser (NOT admin)
-  const metadataRole = typeof user.user_metadata?.role === 'string' ? user.user_metadata.role.toLowerCase() : null
-  const userRole = (profile?.role || metadataRole || "student").toLowerCase()
+  const userRole = (typeof profile?.role === 'string' ? profile.role : "student").toLowerCase()
   if (userRole === "student") {
     redirect("/student/dashboard")
   }
@@ -37,52 +36,70 @@ export default async function AdviserDashboardPage() {
     redirect("/admin/dashboard")
   }
 
-  const { data: approvedSubmissions } = await supabase
-    .from("datasets")
-    .select("id", { count: "exact", head: false })
-    .eq("status", "approved")
-    .order("created_at", { ascending: false })
-    .limit(5)
+  const [approvedRes, pendingAdminRes] = await Promise.all([
+    supabase.from("datasets").select("id", { count: "exact", head: true }).eq("status", "approved"),
+    supabase
+      .from("datasets")
+      .select("id", { count: "exact", head: true })
+      .in("status", ["pending_admin_review", "pending", "pending_review", "for_review"]),
+  ])
 
-  const approvedCount = approvedSubmissions?.length || 0
+  const approvedCount = approvedRes.count ?? 0
+  const pendingAdminCount = pendingAdminRes.count ?? 0
 
   return (
     <div className="relative pt-32 pb-20">
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="mb-10">
-          <h1 className="text-3xl font-bold text-white mb-2">Adviser Dashboard</h1>
-          <p className="text-gray-400 text-lg">
-            Adviser access is focused on browsing approved repository projects and monitoring academic outputs.
+          <h1 className="text-3xl font-bold text-foreground mb-2">Adviser Workspace</h1>
+          <p className="text-muted-foreground text-lg">
+            Monitor pipeline health and access approved institutional research records.
           </p>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6">
           <Link href="/browse">
-            <div className="group rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6 hover:border-cyan-500/50 transition-all duration-300 cursor-pointer h-full">
+            <div className="group rounded-2xl bg-card border border-border p-6 hover:border-cyan-500/50 transition-all duration-300 cursor-pointer h-full">
               <div className="flex items-center gap-4">
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-cyan-600 to-blue-600 flex items-center justify-center group-hover:scale-110 transition-transform">
                   <BookOpen className="w-7 h-7 text-white" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-white group-hover:text-cyan-300 transition-colors">Browse Approved Repository</h3>
-                  <p className="text-gray-400">View approved student capstone projects</p>
+                  <h3 className="text-xl font-semibold text-foreground group-hover:text-cyan-300 transition-colors">Explore Approved Repository</h3>
+                  <p className="text-muted-foreground">Access approved capstone and thesis research records</p>
                 </div>
               </div>
             </div>
           </Link>
 
-          <div className="rounded-2xl bg-gradient-to-b from-[#1a1025] to-[#0f0a1e] border border-white/10 p-6">
-            <p className="text-sm text-gray-400 mb-2">Approved projects available</p>
-            <p className="text-4xl font-bold text-white mb-4">{approvedCount}</p>
-            <p className="text-gray-400 text-sm mb-4">No approve/reject controls are available for adviser role.</p>
+          <div className="rounded-2xl bg-card border border-border p-6">
+            <p className="text-sm text-muted-foreground mb-4">Workflow Snapshot</p>
+            <div className="space-y-3 mb-4">
+              <div className="flex items-center justify-between rounded-lg bg-accent/40 border border-border px-3 py-2">
+                <span className="text-sm text-muted-foreground flex items-center gap-2">
+                  <FileCheck className="w-4 h-4 text-amber-400" />
+                  Pending Admin Review
+                </span>
+                <span className="text-foreground font-semibold">{pendingAdminCount}</span>
+              </div>
+              <div className="flex items-center justify-between rounded-lg bg-accent/40 border border-border px-3 py-2">
+                <span className="text-sm text-muted-foreground flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 text-green-400" />
+                  Approved Repository
+                </span>
+                <span className="text-foreground font-semibold">{approvedCount}</span>
+              </div>
+            </div>
+            <p className="text-muted-foreground text-sm mb-4">Track operational status in real time. Final approval decisions remain under admin governance.</p>
             <Link href="/browse">
-              <Button variant="outline" className="bg-white/5 border-white/10 text-white hover:bg-white/10">
+              <Button variant="outline" className="bg-card border-border text-foreground hover:bg-accent">
                 <Eye className="w-4 h-4 mr-2" />
-                Open Repository
+                Open Repository Intelligence
               </Button>
             </Link>
           </div>
         </div>
+
       </div>
     </div>
   )

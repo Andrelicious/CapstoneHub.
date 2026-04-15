@@ -4,12 +4,11 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
-import { Check, X, RotateCcw, Download, Search, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
+import { Check, X, Download, Search, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
+import { extractOcrInsights } from '@/lib/ocr-insights'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,7 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
-import { approveDataset, returnDataset, rejectDataset } from '@/lib/datasets-actions'
+import { approveDataset, rejectDataset } from '@/lib/datasets-actions'
 
 interface Submission {
   id: string
@@ -30,15 +29,40 @@ interface Submission {
   student_id: string
   student_name: string
   submitted_date: string
-  status: 'pending_admin_review'
-  preview_text: string
+  status: string
+  ocr_status?: string
+  ocr_error_message?: string
   full_ocr_text: string
+  ocr_title?: string
+  ocr_abstract?: string
   quality_flags?: string[]
+  ocr_events?: Array<{
+    status: string
+    source_type?: string | null
+    provider_hint?: string | null
+    duration_ms?: number | null
+    full_text_chars?: number | null
+    has_title?: boolean | null
+    has_abstract?: boolean | null
+    is_title_only_source?: boolean | null
+    error_message?: string | null
+    created_at: string
+  }>
   file_url?: string
 }
 
 interface AdminReviewPageProps {
   submission: Submission
+}
+
+function looksLikeTitleOnlySource(text: string) {
+  const normalized = (text || '').toLowerCase()
+  return (
+    normalized.includes('call number') ||
+    normalized.includes('copyright year') ||
+    normalized.includes('acc #') ||
+    normalized.includes('title author')
+  )
 }
 
 export function AdminReviewPage({ submission }: AdminReviewPageProps) {
@@ -47,9 +71,74 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
 
   const [isLoading, setIsLoading] = useState(false)
   const [searchText, setSearchText] = useState('')
-  const [remarks, setRemarks] = useState('')
-  const [action, setAction] = useState<'return' | 'reject' | null>(null)
+  const [action, setAction] = useState<'reject' | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
+  const ocrEvents = submission.ocr_events || []
+  const normalizedSubmissionStatus = (submission.status || '').toLowerCase()
+  const isDecisionLocked = normalizedSubmissionStatus === 'approved' || normalizedSubmissionStatus === 'rejected'
+  const decisionLabel = normalizedSubmissionStatus === 'approved' ? 'Approved' : 'Rejected'
+  const decisionClass =
+    normalizedSubmissionStatus === 'approved'
+      ? 'bg-green-500/15 text-green-300 border-green-500/30'
+      : 'bg-red-500/15 text-red-300 border-red-500/30'
+
+  const hasFullOcrText = Boolean(submission.full_ocr_text?.trim())
+  const normalizedOcrStatus = (submission.ocr_status || '').toLowerCase()
+  const ocrIsDone = normalizedOcrStatus === 'done'
+  const shouldShowInsights = ocrIsDone && hasFullOcrText
+
+  const derivedInsights = shouldShowInsights
+    ? extractOcrInsights(submission.full_ocr_text || '')
+    : { title: null, abstract: null }
+
+  const title = submission.ocr_title || derivedInsights.title
+  const abstractText = submission.ocr_abstract || derivedInsights.abstract
+  const hasTitle = Boolean(title?.trim())
+  const hasAbstract = Boolean(abstractText?.trim())
+  const isTitleOnlySource = looksLikeTitleOnlySource(submission.full_ocr_text || '')
+
+  const extractionQuality =
+    normalizedOcrStatus === 'failed'
+      ? { label: 'OCR failed', className: 'bg-red-500/15 text-red-300 border-red-500/30' }
+      : normalizedOcrStatus === 'processing' || normalizedOcrStatus === 'queued'
+        ? { label: 'OCR in progress', className: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' }
+        : hasTitle && hasAbstract
+          ? { label: 'Ready for review', className: 'bg-green-500/15 text-green-300 border-green-500/30' }
+          : hasTitle && !hasAbstract && isTitleOnlySource
+            ? { label: 'Title-only source', className: 'bg-green-500/15 text-green-300 border-green-500/30' }
+          : hasTitle || hasAbstract
+            ? { label: 'Partial extraction', className: 'bg-amber-500/15 text-amber-300 border-amber-500/30' }
+            : { label: 'No structured output yet', className: 'bg-white/10 text-gray-300 border-white/15' }
+
+  const pendingLabel =
+    normalizedOcrStatus === 'failed'
+      ? 'Unavailable (OCR failed)'
+      : normalizedOcrStatus === 'processing' || normalizedOcrStatus === 'queued'
+        ? 'Waiting for OCR completion'
+        : 'Not available yet'
+
+  const submittedDate = new Date(submission.submitted_date)
+  const hasValidSubmittedDate = !Number.isNaN(submittedDate.getTime())
+  const submittedDateLabel = hasValidSubmittedDate
+    ? submittedDate.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+      })
+    : 'Unknown'
+
+  const getOcrStatusMessage = () => {
+    if (submission.ocr_status === 'done') return 'OCR completed. Use Full Text for deep search.'
+    if (submission.ocr_status === 'processing' || submission.ocr_status === 'queued') {
+      return 'OCR is still processing for this submission. You can review metadata and open the uploaded file now.'
+    }
+    if (submission.ocr_status === 'failed') {
+      return 'OCR failed for this submission. Please review the uploaded file manually.'
+    }
+    return 'OCR has not produced text yet. Please review using the uploaded file.'
+  }
 
   const handleApprove = async () => {
     setIsLoading(true)
@@ -60,39 +149,11 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
         description: 'Dataset approved successfully',
       })
       router.push('/admin/dashboard')
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to approve submission'
       toast({
         title: 'Error',
-        description: error.message,
-        variant: 'destructive',
-      })
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  const handleReturn = async () => {
-    if (!remarks.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please provide remarks before returning',
-        variant: 'destructive',
-      })
-      return
-    }
-
-    setIsLoading(true)
-    try {
-      await returnDataset(submission.id, remarks)
-      toast({
-        title: 'Success',
-        description: 'Dataset returned to student',
-      })
-      router.push('/admin/dashboard')
-    } catch (error: any) {
-      toast({
-        title: 'Error',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       })
     } finally {
@@ -101,27 +162,19 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
   }
 
   const handleReject = async () => {
-    if (!remarks.trim()) {
-      toast({
-        title: 'Error',
-        description: 'Please provide remarks before rejecting',
-        variant: 'destructive',
-      })
-      return
-    }
-
     setIsLoading(true)
     try {
-      await rejectDataset(submission.id, remarks)
+      await rejectDataset(submission.id)
       toast({
         title: 'Success',
         description: 'Dataset rejected',
       })
       router.push('/admin/dashboard')
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : 'Failed to reject submission'
       toast({
         title: 'Error',
-        description: error.message,
+        description: message,
         variant: 'destructive',
       })
     } finally {
@@ -182,15 +235,13 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                   </div>
                   <div>
                     <p className="text-gray-400 text-sm">Submitted</p>
-                    <p className="text-white font-medium">
-                      {new Date(submission.submitted_date).toLocaleDateString()}
-                    </p>
+                    <p className="text-white font-medium">{submittedDateLabel}</p>
                   </div>
                   {submission.file_url && (
                     <Button variant="outline" className="w-full border-white/20 hover:bg-white/10 bg-transparent" asChild>
-                      <a href={submission.file_url} download>
+                      <a href={submission.file_url} target="_blank" rel="noreferrer">
                         <Download className="w-4 h-4 mr-2" />
-                        Download File
+                        Open Uploaded File
                       </a>
                     </Button>
                   )}
@@ -217,29 +268,97 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                   </CardContent>
                 </Card>
               )}
+
+              {ocrEvents.length > 0 && (
+                <Card className="bg-white/5 backdrop-blur border-white/10">
+                  <CardHeader>
+                    <CardTitle className="text-white">OCR Diagnostics</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {ocrEvents.map((event, index) => {
+                      const eventTime = new Date(event.created_at)
+                      const eventLabel = Number.isNaN(eventTime.getTime())
+                        ? event.created_at
+                        : eventTime.toLocaleString()
+
+                      const statusClass =
+                        event.status === 'done'
+                          ? 'text-green-300 border-green-500/30 bg-green-500/10'
+                          : event.status === 'failed'
+                            ? 'text-red-300 border-red-500/30 bg-red-500/10'
+                            : event.status === 'processing'
+                              ? 'text-cyan-300 border-cyan-500/30 bg-cyan-500/10'
+                              : 'text-amber-300 border-amber-500/30 bg-amber-500/10'
+
+                      return (
+                        <div key={`${event.created_at}-${event.status}-${index}`} className="rounded-lg border border-white/10 bg-white/5 p-3">
+                          <div className="flex items-center justify-between gap-2 mb-2">
+                            <Badge variant="outline" className={statusClass}>
+                              {event.status}
+                            </Badge>
+                            <span className="text-xs text-gray-400">{eventLabel}</span>
+                          </div>
+                          <div className="space-y-1 text-xs text-gray-300">
+                            <p>Source: {event.source_type || 'unknown'} | Provider: {event.provider_hint || 'unknown'}</p>
+                            <p>
+                              Duration: {typeof event.duration_ms === 'number' ? `${event.duration_ms} ms` : 'n/a'} | 
+                              Chars: {typeof event.full_text_chars === 'number' ? event.full_text_chars : 'n/a'}
+                            </p>
+                            <p>
+                              Title: {event.has_title ? 'yes' : 'no'} | Abstract: {event.has_abstract ? 'yes' : 'no'} | 
+                              Title-only source: {event.is_title_only_source ? 'yes' : 'no'}
+                            </p>
+                            {event.error_message ? <p className="text-red-300">Error: {event.error_message}</p> : null}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </CardContent>
+                </Card>
+              )}
             </div>
 
             {/* Right Column: OCR Content & Actions */}
             <div className="lg:col-span-2 space-y-6">
-              {/* OCR Content Tabs */}
               <Card className="bg-white/5 backdrop-blur border-white/10">
                 <CardHeader>
-                  <CardTitle className="text-white">OCR Content</CardTitle>
+                  <div className="flex items-center justify-between gap-3">
+                    <CardTitle className="text-white">Document Insights</CardTitle>
+                    <Badge variant="outline" className={extractionQuality.className}>
+                      {extractionQuality.label}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-gray-400">Best-effort title and abstract extracted from the OCR text.</p>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Title</p>
+                    <p className="text-sm text-white">{title || pendingLabel}</p>
+                  </div>
+
+                  <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                    <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Abstract</p>
+                    <p className="text-sm text-gray-300 whitespace-pre-wrap">
+                      {abstractText || (isTitleOnlySource ? 'No abstract expected for this title-only source.' : pendingLabel)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* OCR Content */}
+              <Card className="bg-white/5 backdrop-blur border-white/10">
+                <CardHeader>
+                  <CardTitle className="text-white">Full OCR Text</CardTitle>
+                  <p className="text-sm text-gray-400">{getOcrStatusMessage()}</p>
                 </CardHeader>
                 <CardContent>
-                  <Tabs defaultValue="preview" className="w-full">
-                    <TabsList className="bg-white/10 border-white/10">
-                      <TabsTrigger value="preview">Preview</TabsTrigger>
-                      <TabsTrigger value="full-text">Full Text</TabsTrigger>
-                    </TabsList>
-
-                    <TabsContent value="preview" className="mt-4">
-                      <div className="bg-white/5 rounded-lg p-4 text-gray-300 text-sm max-h-96 overflow-y-auto whitespace-pre-wrap">
-                        {submission.preview_text || 'No preview available'}
-                      </div>
-                    </TabsContent>
-
-                    <TabsContent value="full-text" className="mt-4 space-y-4">
+                  {submission.ocr_status === 'failed' && submission.ocr_error_message ? (
+                    <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
+                      OCR error: {submission.ocr_error_message}
+                    </div>
+                  ) : null}
+                  {hasFullOcrText ? (
+                    <div className="space-y-4">
                       <div className="relative">
                         <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
                         <Input
@@ -249,6 +368,9 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                           className="pl-10 bg-white/10 border-white/20 text-white placeholder:text-gray-500"
                         />
                       </div>
+                      <p className="text-xs text-gray-400">
+                        Compare the extracted title and abstract against the raw OCR text before approving.
+                      </p>
                       <div className="bg-white/5 rounded-lg p-4 text-gray-300 text-sm max-h-96 overflow-y-auto whitespace-pre-wrap">
                         <div
                           dangerouslySetInnerHTML={{
@@ -256,80 +378,66 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                           }}
                         />
                       </div>
-                    </TabsContent>
-                  </Tabs>
+                    </div>
+                  ) : (
+                    <div className="bg-white/5 rounded-lg p-4 text-gray-300 text-sm">
+                      <p>No OCR full text extracted yet.</p>
+                      {submission.file_url ? <p className="mt-2 text-gray-400">Use Open Uploaded File in Submission Info for manual review.</p> : null}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              {/* Remarks Input */}
-              <Card className="bg-white/5 backdrop-blur border-white/10">
-                <CardHeader>
-                  <CardTitle className="text-white">Admin Remarks</CardTitle>
-                  <p className="text-sm text-gray-400">Required for Return or Reject actions</p>
-                </CardHeader>
-                <CardContent>
-                  <Textarea
-                    placeholder="Add remarks for the student..."
-                    value={remarks}
-                    onChange={(e) => setRemarks(e.target.value)}
-                    className="bg-white/10 border-white/20 text-white placeholder:text-gray-500 resize-none min-h-24"
-                  />
-                </CardContent>
-              </Card>
+              {isDecisionLocked ? (
+                <Card className="bg-white/5 border-white/10">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="text-sm text-gray-300">This submission has already been reviewed and is now read-only.</p>
+                      <Badge variant="outline" className={decisionClass}>
+                        {decisionLabel}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="flex gap-3">
+                  <Button
+                    variant="destructive"
+                    className="flex-1"
+                    onClick={() => {
+                      setAction('reject')
+                      setDialogOpen(true)
+                    }}
+                    disabled={isLoading}
+                  >
+                    <X className="w-4 h-4 mr-2" />
+                    Reject
+                  </Button>
 
-              {/* Action Buttons */}
-              <div className="flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1 border-orange-500/50 text-orange-400 hover:bg-orange-500/10 bg-transparent"
-                  onClick={() => {
-                    setAction('return')
-                    setDialogOpen(true)
-                  }}
-                  disabled={isLoading}
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Return for Revision
-                </Button>
-
-                <Button
-                  variant="destructive"
-                  className="flex-1"
-                  onClick={() => {
-                    setAction('reject')
-                    setDialogOpen(true)
-                  }}
-                  disabled={isLoading}
-                >
-                  <X className="w-4 h-4 mr-2" />
-                  Reject
-                </Button>
-
-                <Button
-                  className="flex-1 bg-green-600 hover:bg-green-500 text-white"
-                  onClick={handleApprove}
-                  disabled={isLoading}
-                >
-                  {isLoading && action === null ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
-                  Approve
-                </Button>
-              </div>
+                  <Button
+                    className="flex-1 bg-green-600 hover:bg-green-500 text-white"
+                    onClick={handleApprove}
+                    disabled={isLoading}
+                  >
+                    {isLoading && action === null ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Check className="w-4 h-4 mr-2" />}
+                    Approve
+                  </Button>
+                </div>
+              )}
             </div>
           </div>
         </div>
       </main>
 
       {/* Confirmation Dialog */}
-      <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <AlertDialog open={dialogOpen && !isDecisionLocked} onOpenChange={setDialogOpen}>
         <AlertDialogContent className="bg-[#1a1425] border-white/10">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-white">
-              {action === 'return' ? 'Return for Revision?' : 'Reject Submission?'}
+              Reject Submission?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {action === 'return'
-                ? 'The student will be able to revise and resubmit their work.'
-                : 'This action cannot be undone. The submission will be marked as rejected.'}
+              This action cannot be undone. The submission will be marked as rejected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -337,18 +445,16 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
               Cancel
             </AlertDialogCancel>
             <AlertDialogAction
-              className={action === 'reject' ? 'bg-red-600 hover:bg-red-500' : 'bg-orange-600 hover:bg-orange-500'}
+              className="bg-red-600 hover:bg-red-500"
               onClick={() => {
-                if (action === 'return') {
-                  handleReturn()
-                } else if (action === 'reject') {
+                if (action === 'reject') {
                   handleReject()
                 }
               }}
               disabled={isLoading}
             >
               {isLoading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-              {action === 'return' ? 'Return' : 'Reject'}
+              Reject
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -12,10 +12,7 @@ export default async function SubmitPage() {
     redirect('/login')
   }
 
-  let role = (typeof user.user_metadata?.role === 'string' ? user.user_metadata.role : 'student').toLowerCase()
-
-  if (role === 'admin') redirect('/admin/dashboard')
-  if (role === 'adviser') redirect('/adviser/dashboard')
+  let role = 'student'
 
   try {
     const serviceClient = await createSupabaseServerClient({
@@ -31,9 +28,7 @@ export default async function SubmitPage() {
     if (typeof profile?.role === 'string') {
       role = profile.role.toLowerCase()
     }
-  } catch {
-    // fall back to metadata-derived role
-  }
+  } catch {}
 
   if (role === 'admin') redirect('/admin/dashboard')
   if (role === 'adviser') redirect('/adviser/dashboard')

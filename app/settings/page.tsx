@@ -11,16 +11,23 @@ import { supabaseBrowser } from "@/lib/supabase/browser"
 import { useToast } from "@/hooks/use-toast"
 import Link from "next/link"
 import Navbar from "@/components/navbar"
+import { useTheme } from "next-themes"
 
 export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
+  const [mounted, setMounted] = useState(false)
   const [settings, setSettings] = useState({
     emailNotifications: true,
     projectUpdates: true,
     marketingEmails: false,
   })
+  const { resolvedTheme, setTheme } = useTheme()
   const router = useRouter()
   const { toast } = useToast()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -56,43 +63,45 @@ export default function SettingsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0612] flex items-center justify-center">
-        <Loader2 className="w-8 h-8 animate-spin text-purple-500" />
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     )
   }
 
+  const isDarkMode = mounted ? resolvedTheme === "dark" : false
+
   return (
-    <div className="min-h-screen bg-[#0a0612]">
+    <div className="min-h-screen bg-background">
       <Navbar />
       <div className="pt-24 pb-12 px-6">
         <div className="max-w-2xl mx-auto">
           {/* Back button */}
           <Link
             href="/student/dashboard"
-            className="inline-flex items-center gap-2 text-gray-400 hover:text-white mb-6 transition-colors"
+            className="inline-flex items-center gap-2 text-muted-foreground hover:text-foreground mb-6 transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to Dashboard
+            Return to Workspace
           </Link>
 
-          <h1 className="text-3xl font-bold text-white mb-8">Settings</h1>
+          <h1 className="text-3xl font-bold text-foreground mb-8">Workspace Settings</h1>
 
           <div className="space-y-6">
             {/* Notifications */}
-            <Card className="bg-[#1a1625]/80 border-white/10">
+            <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Bell className="w-5 h-5 text-purple-400" />
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <Bell className="w-5 h-5 text-primary" />
                   Notifications
                 </CardTitle>
-                <CardDescription className="text-gray-400">Manage how you receive notifications</CardDescription>
+                <CardDescription className="text-muted-foreground">Manage how you receive notifications</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-white">Email Notifications</Label>
-                    <p className="text-sm text-gray-400">Receive updates via email</p>
+                    <Label className="text-foreground">Email Notifications</Label>
+                    <p className="text-sm text-muted-foreground">Receive updates via email</p>
                   </div>
                   <Switch
                     checked={settings.emailNotifications}
@@ -101,8 +110,8 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-white">Project Updates</Label>
-                    <p className="text-sm text-gray-400">Get notified about your capstone status</p>
+                    <Label className="text-foreground">Project Updates</Label>
+                    <p className="text-sm text-muted-foreground">Get notified about your capstone status</p>
                   </div>
                   <Switch
                     checked={settings.projectUpdates}
@@ -111,8 +120,8 @@ export default function SettingsPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-white">Marketing Emails</Label>
-                    <p className="text-sm text-gray-400">Receive news and announcements</p>
+                    <Label className="text-foreground">Marketing Emails</Label>
+                    <p className="text-sm text-muted-foreground">Receive news and announcements</p>
                   </div>
                   <Switch
                     checked={settings.marketingEmails}
@@ -123,49 +132,49 @@ export default function SettingsPage() {
             </Card>
 
             {/* Appearance */}
-            <Card className="bg-[#1a1625]/80 border-white/10">
+            <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Palette className="w-5 h-5 text-cyan-400" />
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <Palette className="w-5 h-5 text-primary" />
                   Appearance
                 </CardTitle>
-                <CardDescription className="text-gray-400">Customize your experience</CardDescription>
+                <CardDescription className="text-muted-foreground">Customize your experience</CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="flex items-center justify-between">
                   <div>
-                    <Label className="text-white">Dark Mode</Label>
-                    <p className="text-sm text-gray-400">Use dark theme</p>
+                    <Label className="text-foreground">Dark Mode</Label>
+                    <p className="text-sm text-muted-foreground">Toggle between light and dark theme</p>
                   </div>
-                  <Switch checked={true} disabled />
+                  <Switch checked={isDarkMode} onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")} />
                 </div>
-                <p className="text-xs text-gray-500 mt-2">Dark mode is always enabled</p>
+                <p className="text-xs text-muted-foreground mt-2">Theme preference is saved in your browser</p>
               </CardContent>
             </Card>
 
             {/* Security */}
-            <Card className="bg-[#1a1625]/80 border-white/10">
+            <Card className="bg-card border-border">
               <CardHeader>
-                <CardTitle className="text-white flex items-center gap-2">
-                  <Shield className="w-5 h-5 text-green-400" />
+                <CardTitle className="text-foreground flex items-center gap-2">
+                  <Shield className="w-5 h-5 text-primary" />
                   Security
                 </CardTitle>
-                <CardDescription className="text-gray-400">Manage your account security</CardDescription>
+                <CardDescription className="text-muted-foreground">Control password and session security</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <Button
                   variant="outline"
-                  className="w-full bg-white/5 border-white/10 text-white hover:bg-white/10"
+                  className="w-full"
                   onClick={() => router.push("/forgot-password")}
                 >
                   Change Password
                 </Button>
                 <Button
                   variant="outline"
-                  className="w-full bg-white/5 border-white/10 text-white hover:bg-white/10"
+                  className="w-full"
                   onClick={handleLogout}
                 >
-                  Sign Out
+                  Sign Out Securely
                 </Button>
               </CardContent>
             </Card>
@@ -187,7 +196,7 @@ export default function SettingsPage() {
                 >
                   Delete Account
                 </Button>
-                <p className="text-xs text-gray-500 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   This action cannot be undone. All your data will be permanently deleted.
                 </p>
               </CardContent>

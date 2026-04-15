@@ -104,7 +104,7 @@ export default function AdminPendingSubmissions({ initialCapstones }: AdminPendi
             <TrendingUp className="w-5 h-5 text-white" />
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-white">Pending Submissions</h2>
+            <h2 className="text-xl font-semibold text-white">Pending Admin Review</h2>
             <p className="text-sm text-muted-foreground">Review and approve or reject capstone submissions</p>
           </div>
         </div>
@@ -127,7 +127,7 @@ export default function AdminPendingSubmissions({ initialCapstones }: AdminPendi
                     <div className="flex flex-wrap items-center gap-2 mb-2">
                       <Badge className="bg-yellow-500/20 border-yellow-500/30 text-yellow-400 border">
                         <Clock className="w-4 h-4 mr-1" />
-                        Pending Review
+                        Pending Admin Review
                       </Badge>
                       {capstone.category && (
                         <Badge className="bg-purple-500/20 text-purple-300 border-purple-500/30">

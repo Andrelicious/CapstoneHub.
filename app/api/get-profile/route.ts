@@ -8,6 +8,8 @@ const normalizeRole = (role: string | null | undefined) => {
 }
 
 export async function GET(request: NextRequest) {
+  const ensureProfile = request.nextUrl.searchParams.get('ensure') !== 'false'
+
   // Create client with service role (bypasses RLS)
   const supabase = await createSupabaseServerClient({
     supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
@@ -34,14 +36,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 })
   }
 
-  const metadataRole = normalizeRole(user.user_metadata?.role)
-
   if (!profile) {
+    if (!ensureProfile) {
+      return NextResponse.json({ profile: null })
+    }
+
     const fallbackProfile = {
       id: user.id,
       email: user.email,
-      display_name: user.user_metadata?.display_name || user.email?.split('@')[0] || 'User',
-      role: metadataRole || 'student',
+      display_name: user.email?.split('@')[0] || 'User',
+      role: 'student',
     }
 
     await supabase.from('profiles').upsert({
@@ -54,7 +58,7 @@ export async function GET(request: NextRequest) {
   }
 
   const profileRole = normalizeRole(profile.role)
-  const resolvedRole = profileRole || metadataRole || 'student'
+  const resolvedRole = profileRole || 'student'
 
   if (profile.role !== resolvedRole) {
     await supabase
