@@ -20,10 +20,11 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Create Supabase client with service role (bypasses RLS)
-    const supabase = await createSupabaseServerClient({
-      supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    })
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    // Use service role when configured; otherwise fallback to auth-scoped client.
+    const supabase = serviceRoleKey
+      ? await createSupabaseServerClient({ supabaseKey: serviceRoleKey })
+      : await createSupabaseServerClient()
 
     // Insert profile using service role
     const { error: profileError } = await supabase.from('profiles').upsert({
@@ -37,6 +38,15 @@ export async function POST(request: NextRequest) {
 
     if (profileError) {
       console.error('Profile creation error:', profileError)
+      if (!serviceRoleKey) {
+        return NextResponse.json(
+          {
+            message:
+              'Profile persistence skipped because SUPABASE_SERVICE_ROLE_KEY is not configured; user can continue with fallback profile.',
+          },
+          { status: 200 }
+        )
+      }
       return NextResponse.json(
         { error: profileError.message || 'Failed to create profile' },
         { status: 500 }
