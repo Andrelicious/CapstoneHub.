@@ -383,14 +383,24 @@ async function getTesseractRecognize(): Promise<TesseractRecognizeFn> {
     return tesseractRecognizeSingleton
   }
 
-  const importRuntime = new Function('moduleName', 'return import(moduleName)') as (
-    moduleName: string
-  ) => Promise<unknown>
-
-  const tesseract = (await importRuntime('tesseract.js')) as {
+  let tesseract: {
     recognize?: TesseractRecognizeFn
     default?: { recognize?: TesseractRecognizeFn }
   }
+
+  try {
+    // Keep this import statically traceable so serverless deployments include tesseract.js.
+    tesseract = (await import('tesseract.js')) as {
+      recognize?: TesseractRecognizeFn
+      default?: { recognize?: TesseractRecognizeFn }
+    }
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(
+      `tesseract.js is unavailable in this runtime. Install it and redeploy, or remove "tesseract" from OCR_PROVIDER_CHAIN. Details: ${message}`
+    )
+  }
+
   const recognize = tesseract?.recognize || tesseract?.default?.recognize
 
   if (typeof recognize !== 'function') {

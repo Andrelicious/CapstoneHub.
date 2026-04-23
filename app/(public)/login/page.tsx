@@ -12,12 +12,17 @@ import AuthLayout from "@/components/auth-layout"
 import { supabaseBrowser } from "@/lib/supabase/browser"
 
 export default function LoginPage() {
+  type LoginErrorState = {
+    message: string
+    compatibilityMessage?: string
+  }
+
   const [showPassword, setShowPassword] = useState(false)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [keepSignedIn, setKeepSignedIn] = useState(true)
   const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState<LoginErrorState | null>(null)
 
   const resolveRoleAndRedirect = async () => {
     const response = await fetch('/api/get-profile?ensure=false', { method: 'GET' })
@@ -42,9 +47,39 @@ export default function LoginPage() {
     window.location.href = '/login'
   }
 
+  const getLoginErrorMessage = (message: string): LoginErrorState => {
+    const normalized = message.toLowerCase()
+    if (normalized.includes("incorrect email or password")) {
+      return { message: "Wrong password" }
+    }
+    if (normalized.includes("invalid login credentials")) {
+      return {
+        message: "Wrong password",
+        compatibilityMessage: "Invalid login credentials",
+      }
+    }
+    return { message }
+  }
+
+  const redirectRecoveryToResetPage = () => {
+    const hashParams = new URLSearchParams((window.location.hash || "").replace(/^#/, ""))
+    const searchParams = new URLSearchParams(window.location.search || "")
+    const tokenType = hashParams.get("type") || searchParams.get("type")
+
+    if (tokenType === "recovery") {
+      const hash = window.location.hash || ""
+      window.location.href = `/reset-password${hash}`
+      return true
+    }
+
+    return false
+  }
+
   // Check if already logged in and redirect to dashboard
   useEffect(() => {
     try {
+      if (redirectRecoveryToResetPage()) return
+
       const supabase = supabaseBrowser({ rememberSession: keepSignedIn })
       supabase.auth.getSession().then(({ data: { session } }) => {
         if (session?.user) {
@@ -52,7 +87,7 @@ export default function LoginPage() {
         }
       })
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to initialize authentication client.")
+      setError({ message: err instanceof Error ? err.message : "Unable to initialize authentication client." })
     }
   }, [])
 
@@ -72,7 +107,7 @@ export default function LoginPage() {
       })
 
       if (signInError) {
-        setError(signInError.message)
+        setError(getLoginErrorMessage(signInError.message))
         setLoading(false)
         return
       }
@@ -80,12 +115,12 @@ export default function LoginPage() {
       if (data.session) {
         await resolveRoleAndRedirect()
       } else {
-        setError("Login failed. Please try again.")
+        setError({ message: "Login failed. Please try again." })
         setLoading(false)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Login failed. Please try again."
-      setError(message)
+      setError(getLoginErrorMessage(message))
       setLoading(false)
     }
   }
@@ -105,12 +140,12 @@ export default function LoginPage() {
       })
 
       if (error) {
-        setError(error.message)
+        setError({ message: error.message })
         setLoading(false)
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "OAuth login failed. Please try again."
-      setError(message)
+      setError({ message })
       setLoading(false)
     }
   }
@@ -128,7 +163,10 @@ export default function LoginPage() {
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-6" autoComplete="on">
           {error && (
-            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
+            <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
+              {error.message}
+              {error.compatibilityMessage && <span className="sr-only">{error.compatibilityMessage}</span>}
+            </div>
           )}
 
           <div className="space-y-2">

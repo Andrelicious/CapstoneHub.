@@ -65,6 +65,18 @@ function looksLikeTitleOnlySource(text: string) {
   )
 }
 
+function isConfigurationOcrIssue(message: string | null | undefined) {
+  const normalized = (message || '').toLowerCase()
+  return (
+    normalized.includes('not configured') ||
+    normalized.includes('ocr_ai_endpoint') ||
+    normalized.includes('google vision') ||
+    normalized.includes('credentials') ||
+    normalized.includes('cannot find package') ||
+    normalized.includes('tesseract fallback is unavailable')
+  )
+}
+
 export function AdminReviewPage({ submission }: AdminReviewPageProps) {
   const router = useRouter()
   const { toast } = useToast()
@@ -84,6 +96,9 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
 
   const hasFullOcrText = Boolean(submission.full_ocr_text?.trim())
   const normalizedOcrStatus = (submission.ocr_status || '').toLowerCase()
+  const ocrFailureIsConfigurationIssue =
+    isConfigurationOcrIssue(submission.ocr_error_message) ||
+    ocrEvents.some((event) => isConfigurationOcrIssue(event.error_message))
   const ocrIsDone = normalizedOcrStatus === 'done'
   const shouldShowInsights = ocrIsDone && hasFullOcrText
 
@@ -99,7 +114,9 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
 
   const extractionQuality =
     normalizedOcrStatus === 'failed'
-      ? { label: 'OCR failed', className: 'bg-red-500/15 text-red-300 border-red-500/30' }
+      ? ocrFailureIsConfigurationIssue
+        ? { label: 'OCR unavailable (config)', className: 'bg-amber-500/15 text-amber-300 border-amber-500/30' }
+        : { label: 'OCR failed', className: 'bg-red-500/15 text-red-300 border-red-500/30' }
       : normalizedOcrStatus === 'processing' || normalizedOcrStatus === 'queued'
         ? { label: 'OCR in progress', className: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' }
         : hasTitle && hasAbstract
@@ -112,7 +129,9 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
 
   const pendingLabel =
     normalizedOcrStatus === 'failed'
-      ? 'Unavailable (OCR failed)'
+      ? ocrFailureIsConfigurationIssue
+        ? 'Unavailable (OCR not configured)'
+        : 'Unavailable (OCR failed)'
       : normalizedOcrStatus === 'processing' || normalizedOcrStatus === 'queued'
         ? 'Waiting for OCR completion'
         : 'Not available yet'
@@ -135,6 +154,9 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
       return 'OCR is still processing for this submission. You can review metadata and open the uploaded file now.'
     }
     if (submission.ocr_status === 'failed') {
+      if (ocrFailureIsConfigurationIssue) {
+        return 'OCR is currently unavailable due to provider configuration. You can continue manual review using the uploaded file.'
+      }
       return 'OCR failed for this submission. Please review the uploaded file manually.'
     }
     return 'OCR has not produced text yet. Please review using the uploaded file.'
@@ -308,7 +330,11 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                               Title: {event.has_title ? 'yes' : 'no'} | Abstract: {event.has_abstract ? 'yes' : 'no'} | 
                               Title-only source: {event.is_title_only_source ? 'yes' : 'no'}
                             </p>
-                            {event.error_message ? <p className="text-red-300">Error: {event.error_message}</p> : null}
+                            {event.error_message ? (
+                              <p className={isConfigurationOcrIssue(event.error_message) ? 'text-amber-300' : 'text-red-300'}>
+                                {isConfigurationOcrIssue(event.error_message) ? 'Note' : 'Error'}: {event.error_message}
+                              </p>
+                            ) : null}
                           </div>
                         </div>
                       )
@@ -353,8 +379,14 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                 </CardHeader>
                 <CardContent>
                   {submission.ocr_status === 'failed' && submission.ocr_error_message ? (
-                    <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">
-                      OCR error: {submission.ocr_error_message}
+                    <div
+                      className={`mb-4 rounded-lg p-3 text-sm ${
+                        ocrFailureIsConfigurationIssue
+                          ? 'border border-amber-500/30 bg-amber-500/10 text-amber-100'
+                          : 'border border-red-500/30 bg-red-500/10 text-red-200'
+                      }`}
+                    >
+                      {ocrFailureIsConfigurationIssue ? 'OCR note' : 'OCR error'}: {submission.ocr_error_message}
                     </div>
                   ) : null}
                   {hasFullOcrText ? (

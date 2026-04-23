@@ -86,6 +86,9 @@ function validateUploadedFileForOCR(file: File) {
 
 function normalizeOCRFailureMessage(rawMessage: string) {
   const message = (rawMessage || '').trim()
+  const sanitizedMessage = message
+    .replace(/\/var\/task\/[^\s|]+/gi, '[server-bundle-path]')
+    .replace(/[A-Z]:\\[^\s|]+/gi, '[local-path]')
   const lower = message.toLowerCase()
 
   if (lower.includes('timed out')) {
@@ -108,7 +111,19 @@ function normalizeOCRFailureMessage(rawMessage: string) {
     return 'No readable text was detected. Please retake or reupload a clearer document.'
   }
 
-  return message || 'OCR processing failed. Please try again.'
+  if (lower.includes('ocr_provider=ocr_ai requires ocr_ai_endpoint')) {
+    return 'OCR AI endpoint is not configured. Set OCR_AI_ENDPOINT (and OCR_AI_API_KEY if required) in deployment environment variables.'
+  }
+
+  if (lower.includes('google vision ocr is not configured')) {
+    return 'Google Vision fallback is not configured. Set GOOGLE_VISION_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS.'
+  }
+
+  if (lower.includes('cannot find package') && lower.includes('tesseract.js')) {
+    return 'Tesseract fallback is unavailable in this deployment. Install tesseract.js and redeploy, or remove tesseract from OCR_PROVIDER_CHAIN.'
+  }
+
+  return sanitizedMessage || 'OCR processing failed. Please try again.'
 }
 
 function normalizeSubmissionField(value: string | null | undefined) {
@@ -1340,25 +1355,14 @@ export async function submitForAdminReview(datasetId: string) {
   const latestOcrJob = await getLatestOCRJobByDatasetId(supabase, datasetId)
   const ocrDoneFallback = await getOCRResultDoneFallback(supabase, datasetId)
 
-  // Enforce OCR workflow for submissions that do not have any OCR trail yet.
-  // This prevents records from entering admin review with no OCR job/results row.
+  // Best-effort OCR kickoff for datasets with no OCR trail yet.
+  // Admin review remains available even if OCR is pending/failed.
   if (!latestOcrJob && !ocrDoneFallback) {
-    await submitForOCR(datasetId)
-  }
-
-  const ocrResults = await getOCRResults(datasetId)
-  const hasOcrText = Boolean(ocrResults?.full_text?.trim())
-
-  if (!hasOcrText) {
-    const latestJobAfterKickoff = await getLatestOCRJobByDatasetId(supabase, datasetId)
-    const normalizedStatus = (latestJobAfterKickoff?.status || '').toString().toLowerCase()
-    const latestError = (latestJobAfterKickoff?.error_message || '').toString().trim()
-
-    if (normalizedStatus === 'failed') {
-      throw new Error(latestError || 'OCR failed. Please re-upload a clearer document and try again.')
+    try {
+      await submitForOCR(datasetId)
+    } catch {
+      // OCR is optional for admin decision flow; diagnostics are shown in admin review.
     }
-
-    throw new Error('OCR is still processing. Please wait for OCR completion before submitting for admin review.')
   }
 
   await ensureNoDuplicateSubmission(

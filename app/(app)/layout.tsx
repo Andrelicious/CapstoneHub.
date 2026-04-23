@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation"
-import { cookies } from "next/headers"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { getCurrentProfileServer } from "@/lib/profile-server"
 import Navbar from "@/components/navbar"
 import Footer from "@/components/footer"
 
@@ -9,7 +9,6 @@ export default async function AppLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
-  const cookieStore = await cookies()
   const supabase = await createSupabaseServerClient()
 
   // Check authentication
@@ -22,13 +21,8 @@ export default async function AppLayout({
   // Fetch user profile to get role (using service role to avoid RLS issues)
   let userRole = "student"
   try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile } = await profileRes.json()
-      userRole = profile?.role || "student"
-    }
+    const { profile } = await getCurrentProfileServer()
+    userRole = profile?.role || "student"
   } catch (e) {
     console.error("Failed to fetch profile:", e)
   }

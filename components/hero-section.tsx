@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import AbstractShapes from "@/components/abstract-shapes"
 import ParticleField from "@/components/particle-field"
 import { supabaseBrowser } from "@/lib/supabase/browser"
+import { getCachedClientProfile } from "@/lib/profile-client"
 
 export default function HeroSection() {
   const [searchQuery, setSearchQuery] = useState("")
@@ -23,9 +24,8 @@ export default function HeroSection() {
       } = await supabase.auth.getSession()
       if (session?.user) {
         try {
-          const response = await fetch('/api/get-profile')
-          if (response.ok) {
-            const { profile } = await response.json()
+          const profile = await getCachedClientProfile()
+          if (profile) {
             setUserRole(typeof profile?.role === 'string' ? profile.role.toLowerCase() : 'student')
             return
           }

@@ -48,10 +48,26 @@ function looksLikeTitleOnlySource(text: string) {
 function getReadableErrorMessage(error: unknown) {
   if (!error) return 'Something went wrong. Please try again.'
   if (typeof error === 'string') return error
-  if (error instanceof Error && error.message?.trim()) return error.message
+  if (error instanceof Error && error.message?.trim()) {
+    const normalized = error.message.toLowerCase()
+    if (normalized.includes('an unexpected response was received from the server')) {
+      return 'The server returned an unexpected response. Please try again. If the file is large, retry with a smaller file and check deployment logs.'
+    }
+    if (normalized.includes('failed to fetch')) {
+      return 'Unable to reach the server. Check your internet connection and deployment status, then try again.'
+    }
+    return error.message
+  }
 
   const maybeMessage = (error as { message?: unknown })?.message
   if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+    const normalized = maybeMessage.toLowerCase()
+    if (normalized.includes('an unexpected response was received from the server')) {
+      return 'The server returned an unexpected response. Please try again. If the file is large, retry with a smaller file and check deployment logs.'
+    }
+    if (normalized.includes('failed to fetch')) {
+      return 'Unable to reach the server. Check your internet connection and deployment status, then try again.'
+    }
     return maybeMessage
   }
 
@@ -285,7 +301,13 @@ export function DatasetSubmissionWizard() {
           setOcrResults(results)
           setStep(4)
         } else if (job?.status === 'failed') {
-          throw new Error('OCR processing failed')
+          const results = await getOCRResults(datasetId).catch(() => null)
+          setOcrResults(results)
+          toast({
+            title: 'OCR failed',
+            description: 'You can continue and submit for admin review. Admin can review using the uploaded file and diagnostics.',
+          })
+          setStep(4)
         } else {
           const results = await getOCRResults(datasetId)
           setOcrResults(results)

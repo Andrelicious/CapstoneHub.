@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabaseBrowser } from "@/lib/supabase/browser"
+import { getCachedClientProfile } from "@/lib/profile-client"
 import AuthLayout from "@/components/auth-layout"
 import { Button } from "@/components/ui/button"
 import type { UserRole } from "@/types"
@@ -52,10 +53,9 @@ export default function OAuthRoleSelectionPage() {
           return
         }
 
-        const profileResponse = await fetch("/api/get-profile?ensure=false")
-        if (profileResponse.ok) {
-          const { profile } = await profileResponse.json()
-          const existingRole = typeof profile?.role === "string" ? profile.role.toLowerCase() : null
+        const profile = await getCachedClientProfile({ ensureProfile: false })
+        if (profile) {
+          const existingRole = typeof profile.role === "string" ? profile.role.toLowerCase() : null
 
           if (existingRole === "admin" || existingRole === "adviser" || existingRole === "student") {
             setSelectedRole(existingRole)

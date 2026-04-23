@@ -10,19 +10,20 @@ const normalizeRole = (role: string | null | undefined) => {
 export async function GET(request: NextRequest) {
   const ensureProfile = request.nextUrl.searchParams.get('ensure') !== 'false'
 
-  // Create client with service role (bypasses RLS)
-  const supabase = await createSupabaseServerClient({
-    supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  })
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
   // Get authenticated user
   const authClient = await createSupabaseServerClient()
-
   const { data: { user } } = await authClient.auth.getUser()
 
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+
+  // Create client with service role (bypasses RLS)
+  const supabase = serviceRoleKey
+    ? await createSupabaseServerClient({ supabaseKey: serviceRoleKey })
+    : authClient
 
   // Fetch profile using service role (bypasses RLS)
   const { data: profile, error } = await supabase
@@ -33,6 +34,17 @@ export async function GET(request: NextRequest) {
 
   if (error && error.code !== 'PGRST116') {
     console.error('Error fetching profile:', error)
+
+    if (!serviceRoleKey) {
+      const fallbackProfile = {
+        id: user.id,
+        email: user.email,
+        display_name: user.email?.split('@')[0] || 'User',
+        role: 'student',
+      }
+      return NextResponse.json({ profile: fallbackProfile })
+    }
+
     return NextResponse.json({ error: 'Failed to fetch profile' }, { status: 500 })
   }
 

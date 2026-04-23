@@ -4,6 +4,7 @@ import { useEffect } from "react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { supabaseBrowser } from "@/lib/supabase/browser"
+import { getCachedClientProfile } from "@/lib/profile-client"
 import { Zap, BookOpen, CheckCircle2 } from "lucide-react"
 import BrandLogo from "@/components/brand-logo"
 
@@ -13,10 +14,9 @@ export default function Home() {
     const supabase = supabaseBrowser()
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user) {
-        fetch('/api/get-profile')
-          .then((res) => (res.ok ? res.json() : null))
-          .then((payload) => {
-            const role = (payload?.profile?.role || 'student').toLowerCase()
+        getCachedClientProfile({ ensureProfile: false })
+          .then((profile) => {
+            const role = (profile?.role || 'student').toLowerCase()
             if (role === "admin") {
               window.location.href = "/admin/dashboard"
             } else if (role === "adviser") {

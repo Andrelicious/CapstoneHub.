@@ -11,6 +11,7 @@ Use this checklist before enabling OCR in production.
 - Set `OCR_AI_API_KEY` if your OCR service requires bearer authentication
 - Set `OCR_AI_TIMEOUT_MS` and `OCR_AI_MAX_RETRIES` for your latency/SLA profile
 - Configure Google fallback credentials (`GOOGLE_APPLICATION_CREDENTIALS` or `GOOGLE_VISION_CREDENTIALS_JSON`)
+- If tesseract fallback is not installed in your runtime, remove it from the chain (for example: `OCR_PROVIDER_CHAIN=ocr_ai,google_vision`).
 
 ## 2) Endpoint Contract Validation
 

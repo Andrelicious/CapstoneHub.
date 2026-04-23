@@ -1,8 +1,8 @@
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { restoreOwnDataset } from '@/lib/datasets-actions'
+import { getCurrentProfileServer } from '@/lib/profile-server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { ArrowLeft, ArchiveRestore, Clock3, Trash2, Calendar } from 'lucide-react'
@@ -44,7 +44,6 @@ function formatRelativePurgeDate(deletedAt: string | null | undefined) {
 }
 
 export default async function StudentTrashPage() {
-  const cookieStore = await cookies()
   const supabase = await createSupabaseServerClient()
 
   const { data: { user } } = await supabase.auth.getUser()
@@ -52,13 +51,8 @@ export default async function StudentTrashPage() {
 
   let profile = null
   try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile: p } = await profileRes.json()
-      profile = p
-    }
+    const resolved = await getCurrentProfileServer()
+    profile = resolved.profile
   } catch (error) {
     console.error('Failed to fetch profile:', error)
   }

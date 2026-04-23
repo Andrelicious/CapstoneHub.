@@ -1,12 +1,11 @@
 import { redirect } from "next/navigation"
-import { cookies } from "next/headers"
 import { createSupabaseServerClient } from "@/lib/supabase/server"
+import { getCurrentProfileServer } from "@/lib/profile-server"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { BookOpen, CheckCircle2 } from "lucide-react"
 
 export default async function AdminDashboardPage() {
-  const cookieStore = await cookies()
   const supabase = await createSupabaseServerClient()
 
   // Check authentication
@@ -16,13 +15,8 @@ export default async function AdminDashboardPage() {
   // Fetch profile using service role API to avoid RLS infinite recursion
   let profile = null
   try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile: p } = await profileRes.json()
-      profile = p
-    }
+    const resolved = await getCurrentProfileServer()
+    profile = resolved.profile
   } catch (e) {
     console.error('Failed to fetch profile:', e)
   }
@@ -52,7 +46,7 @@ export default async function AdminDashboardPage() {
                 </div>
                 <div>
                   <h3 className="text-xl font-semibold text-foreground group-hover:text-cyan-300 transition-colors">Explore Repository Intelligence</h3>
-                  <p className="text-muted-foreground">Review approved academic outputs and metadata quality</p>
+                  <p className="text-muted-foreground">Review approved academic outputs and quality</p>
                 </div>
               </div>
             </div>

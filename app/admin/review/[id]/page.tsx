@@ -1,8 +1,8 @@
-import { cookies } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { AdminReviewPage } from '@/components/admin-review-page'
 import { getOCRResults as getDatasetOCRResults } from '@/lib/datasets-actions'
+import { getCurrentProfileServer } from '@/lib/profile-server'
 
 function hasMissingColumnError(message: string, column: string) {
   const normalized = (message || '').toLowerCase()
@@ -22,7 +22,6 @@ function isMissingTableError(message: string, table: string) {
 }
 
 async function getSubmissionData(id: string) {
-  const cookieStore = await cookies()
   const supabase = await createSupabaseServerClient()
 
   const {
@@ -37,13 +36,8 @@ async function getSubmissionData(id: string) {
   // Fetch admin profile using service role API to avoid RLS infinite recursion
   let adminProfile = null
   try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile: p } = await profileRes.json()
-      adminProfile = p
-    }
+    const resolved = await getCurrentProfileServer()
+    adminProfile = resolved.profile
   } catch (e) {
     console.error('Failed to fetch profile:', e)
   }

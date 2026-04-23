@@ -1,6 +1,30 @@
 import { createServerClient } from "@supabase/ssr"
 import { NextResponse, type NextRequest } from "next/server"
 
+function isSupabaseAuthCookie(name: string) {
+  const normalized = (name || "").toLowerCase()
+  return normalized.includes("supabase") || normalized.includes("sb-")
+}
+
+function clearSupabaseAuthCookies(request: NextRequest, response: NextResponse) {
+  const cookiesToClear = request.cookies.getAll().filter((cookie) => isSupabaseAuthCookie(cookie.name))
+
+  cookiesToClear.forEach((cookie) => {
+    try {
+      request.cookies.delete(cookie.name)
+    } catch {
+      // Best-effort only; request cookies may be immutable in some runtimes.
+    }
+
+    response.cookies.delete(cookie.name)
+    response.cookies.set(cookie.name, "", {
+      maxAge: 0,
+      expires: new Date(0),
+      path: "/",
+    })
+  })
+}
+
 export async function updateSession(request: NextRequest) {
   let supabaseResponse = NextResponse.next({
     request,
@@ -29,22 +53,14 @@ export async function updateSession(request: NextRequest) {
   try {
     const { data, error } = await supabase.auth.getUser()
     if (error) {
-      // Session is invalid/stale - clear auth cookies
-      const cookiesToClear = request.cookies
-        .getAll()
-        .filter((c) => c.name.includes("supabase") || c.name.includes("sb-"))
-      cookiesToClear.forEach((cookie) => {
-        supabaseResponse.cookies.delete(cookie.name)
-      })
+      // Session is invalid/stale - clear auth cookies.
+      clearSupabaseAuthCookies(request, supabaseResponse)
     } else {
       user = data.user
     }
   } catch {
-    // Session fetch failed - clear auth cookies
-    const cookiesToClear = request.cookies.getAll().filter((c) => c.name.includes("supabase") || c.name.includes("sb-"))
-    cookiesToClear.forEach((cookie) => {
-      supabaseResponse.cookies.delete(cookie.name)
-    })
+    // Session fetch failed - clear auth cookies.
+    clearSupabaseAuthCookies(request, supabaseResponse)
   }
 
   if (user && (request.nextUrl.pathname === "/login" || request.nextUrl.pathname === "/register")) {

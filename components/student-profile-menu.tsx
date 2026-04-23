@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useRouter } from "next/navigation"
 import { supabaseBrowser } from "@/lib/supabase/browser"
+import { getCachedClientProfile, clearCachedClientProfile } from "@/lib/profile-client"
 import { User, Settings, LogOut } from "lucide-react"
 
 interface Profile {
@@ -31,9 +32,8 @@ export function StudentProfileMenu() {
       }
 
       try {
-        const response = await fetch('/api/get-profile')
-        if (response.ok) {
-          const { profile: apiProfile } = await response.json()
+        const apiProfile = await getCachedClientProfile()
+        if (apiProfile) {
           setProfile({
             id: user.id,
             display_name: apiProfile?.display_name || user.email?.split("@")[0] || "User",
@@ -67,6 +67,7 @@ export function StudentProfileMenu() {
   const handleLogout = async () => {
     const supabase = supabaseBrowser()
     await supabase.auth.signOut()
+    clearCachedClientProfile()
     window.location.href = "/"
   }
 

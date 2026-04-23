@@ -14,29 +14,58 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null)
+  const recoveryMessage = "Password reset link has been sent to your email. Please check your inbox."
+
+  const normalizeEmailInput = (value: string) => {
+    const normalized = value
+      .normalize("NFKC")
+      .replace(/[\u201C\u201D\u2018\u2019]/g, '"')
+      .replace(/[\u200B-\u200D\u2060\uFEFF]/g, "")
+      .replace(/^mailto:/i, "")
+      .trim()
+
+    const extracted = normalized.match(/<?([A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,})>?/)
+    const base = extracted ? extracted[1] : normalized
+    return base.replace(/^['"]+|['"]+$/g, "").replace(/\s+/g, "")
+  }
+
+  const isValidEmailFormat = (value: string) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
     setMessage(null)
 
+    const normalizedEmail = normalizeEmailInput(email)
+    if (!normalizedEmail) {
+      setMessage({ type: "error", text: "Please enter your email address." })
+      setLoading(false)
+      return
+    }
+
+    if (!isValidEmailFormat(normalizedEmail)) {
+      setMessage({ type: "error", text: "Please enter a valid email address." })
+      setLoading(false)
+      return
+    }
+
     try {
       const supabase = supabaseBrowser()
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const { error } = await supabase.auth.resetPasswordForEmail(normalizedEmail, {
         redirectTo: `${window.location.origin}/reset-password`,
       })
 
       if (error) {
-        setMessage({ type: "error", text: error.message })
+        // Keep reset flow simple for users and avoid exposing transport/provider details.
+        setMessage({ type: "success", text: recoveryMessage })
       } else {
-        setMessage({
-          type: "success",
-          text: "Password reset link has been sent to your email. Please check your inbox.",
-        })
+        setMessage({ type: "success", text: recoveryMessage })
         setEmail("")
       }
     } catch (error) {
-      setMessage({ type: "error", text: "An unexpected error occurred. Please try again." })
+      setMessage({ type: "success", text: recoveryMessage })
     } finally {
       setLoading(false)
     }
@@ -79,6 +108,7 @@ export default function ForgotPasswordPage() {
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={() => setEmail((current) => normalizeEmailInput(current))}
                 required
                 disabled={loading}
                 autoComplete="email"

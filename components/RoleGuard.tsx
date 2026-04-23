@@ -4,6 +4,7 @@ import React from "react"
 
 import { useEffect, useState } from 'react'
 import { supabaseBrowser } from '@/lib/supabase/browser'
+import { getCachedClientProfile } from '@/lib/profile-client'
 import { Button } from '@/components/ui/button'
 import { AlertCircle } from 'lucide-react'
 import Link from 'next/link'
@@ -33,9 +34,8 @@ export function RoleGuard({ allowedRoles, children }: RoleGuardProps) {
         }
 
         try {
-          const response = await fetch('/api/get-profile', { method: 'GET' })
-          if (response.ok) {
-            const { profile } = await response.json()
+          const profile = await getCachedClientProfile()
+          if (profile) {
             const roleFromProfile =
               typeof profile?.role === 'string' ? profile.role.toLowerCase() : null
             setRole(roleFromProfile || 'student')

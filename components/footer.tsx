@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { supabaseBrowser } from "@/lib/supabase/browser"
+import { getCachedClientProfile, clearCachedClientProfile } from "@/lib/profile-client"
 import BrandLogo from "@/components/brand-logo"
 
 export default function Footer() {
@@ -18,9 +19,8 @@ export default function Footer() {
       if (session?.user) {
         setIsAuthenticated(true)
         try {
-          const response = await fetch('/api/get-profile')
-          if (response.ok) {
-            const { profile } = await response.json()
+          const profile = await getCachedClientProfile()
+          if (profile) {
             setRole(typeof profile?.role === 'string' ? profile.role.toLowerCase() : 'student')
           } else {
             setRole('student')
@@ -40,6 +40,7 @@ export default function Footer() {
   const handleLogout = async () => {
     const supabase = supabaseBrowser()
     await supabase.auth.signOut()
+    clearCachedClientProfile()
     window.location.href = "/"
   }
 

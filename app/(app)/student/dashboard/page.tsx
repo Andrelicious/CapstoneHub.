@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { deleteOwnDataset } from '@/lib/datasets-actions'
+import { getCurrentProfileServer } from '@/lib/profile-server'
 import { Upload, BookOpen, Clock, CheckCircle2, XCircle, Eye, FileText, Calendar, ArrowRight, GraduationCap, Trash2, ArchiveRestore } from 'lucide-react'
 
 type WorkflowStatus = 'draft' | 'ocr_processing' | 'pending_admin_review' | 'approved' | 'rejected'
@@ -36,7 +36,6 @@ const statusConfig = {
 }
 
 export default async function StudentDashboardPage() {
-  const cookieStore = await cookies()
   const supabase = await createSupabaseServerClient()
 
   // Check authentication & role
@@ -46,13 +45,8 @@ export default async function StudentDashboardPage() {
   // Fetch profile using service role API to avoid RLS infinite recursion
   let profile = null
   try {
-    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
-      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
-    })
-    if (profileRes.ok) {
-      const { profile: p } = await profileRes.json()
-      profile = p
-    }
+    const resolved = await getCurrentProfileServer()
+    profile = resolved.profile
   } catch (e) {
     console.error('Failed to fetch profile:', e)
   }
