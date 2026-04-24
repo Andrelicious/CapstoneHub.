@@ -24,6 +24,7 @@ import { approveDataset, rejectDataset } from '@/lib/datasets-actions'
 interface Submission {
   id: string
   title: string
+  submission_description?: string
   program: string
   document_type: string
   student_id: string
@@ -108,9 +109,16 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
 
   const title = submission.ocr_title || derivedInsights.title
   const abstractText = submission.ocr_abstract || derivedInsights.abstract
+  const fallbackTitle = submission.title || ''
+  const fallbackAbstract = submission.submission_description || ''
   const hasTitle = Boolean(title?.trim())
   const hasAbstract = Boolean(abstractText?.trim())
+  const hasFallbackTitle = Boolean(fallbackTitle.trim())
+  const hasFallbackAbstract = Boolean(fallbackAbstract.trim())
   const isTitleOnlySource = looksLikeTitleOnlySource(submission.full_ocr_text || '')
+
+  const displayTitle = title || fallbackTitle || pendingLabel
+  const displayAbstract = abstractText || fallbackAbstract || (isTitleOnlySource ? 'No abstract expected for this title-only source.' : pendingLabel)
 
   const extractionQuality =
     normalizedOcrStatus === 'failed'
@@ -359,15 +367,18 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                 <CardContent className="space-y-4">
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                     <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Title</p>
-                    <p className="text-sm text-white">{title || pendingLabel}</p>
+                    <p className="text-sm text-white">{displayTitle}</p>
                   </div>
 
                   <div className="rounded-lg border border-white/10 bg-white/5 p-3">
                     <p className="text-xs uppercase tracking-wide text-gray-400 mb-1">Abstract</p>
                     <p className="text-sm text-gray-300 whitespace-pre-wrap">
-                      {abstractText || (isTitleOnlySource ? 'No abstract expected for this title-only source.' : pendingLabel)}
+                      {displayAbstract}
                     </p>
                   </div>
+                  {!hasTitle && (hasFallbackTitle || hasFallbackAbstract) ? (
+                    <p className="text-xs text-amber-300">Showing submission metadata fallback because OCR output is not available yet.</p>
+                  ) : null}
                 </CardContent>
               </Card>
 
@@ -414,6 +425,9 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                   ) : (
                     <div className="bg-white/5 rounded-lg p-4 text-gray-300 text-sm">
                       <p>No OCR full text extracted yet.</p>
+                      {hasFallbackAbstract ? (
+                        <p className="mt-2 text-gray-400">Submission description: {fallbackAbstract}</p>
+                      ) : null}
                       {submission.file_url ? <p className="mt-2 text-gray-400">Use Open Uploaded File in Submission Info for manual review.</p> : null}
                     </div>
                   )}

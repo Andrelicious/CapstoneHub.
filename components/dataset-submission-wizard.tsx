@@ -35,6 +35,28 @@ interface FormData {
   tags: string
 }
 
+const DEFAULT_OCR_MAX_FILE_BYTES = 20 * 1024 * 1024
+
+function getClientOCRMaxFileBytes() {
+  const raw = Number(process.env.NEXT_PUBLIC_OCR_MAX_FILE_BYTES)
+  if (!Number.isFinite(raw) || raw <= 0) {
+    return DEFAULT_OCR_MAX_FILE_BYTES
+  }
+  return Math.floor(raw)
+}
+
+function formatBytes(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '0 B'
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB']
+  const order = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1)
+  const normalized = value / Math.pow(1024, order)
+  const digits = order === 0 ? 0 : 1
+  return `${normalized.toFixed(digits)} ${units[order]}`
+}
+
 function looksLikeTitleOnlySource(text: string) {
   const normalized = (text || '').toLowerCase()
   return (
@@ -292,6 +314,25 @@ export function DatasetSubmissionWizard() {
         toast({
           title: 'Error',
           description: 'Please select a file',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      const maxFileSize = getClientOCRMaxFileBytes()
+      if (!Number.isFinite(file.size) || file.size <= 0) {
+        toast({
+          title: 'Error',
+          description: 'The selected file is empty. Please upload a valid document.',
+          variant: 'destructive',
+        })
+        return
+      }
+
+      if (file.size > maxFileSize) {
+        toast({
+          title: 'File too large for OCR',
+          description: `Maximum OCR file size is ${formatBytes(maxFileSize)}. Please upload a smaller file or compress this document.`,
           variant: 'destructive',
         })
         return

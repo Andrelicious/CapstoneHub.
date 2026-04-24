@@ -172,6 +172,7 @@ async function getSubmissionData(id: string) {
   const transformedSubmission = {
     id: dataset.id,
     title: dataset.title || '',
+    submission_description: dataset.description || '',
     program: dataset.program || 'General',
     document_type: dataset.doc_type || 'Capstone Project',
     student_id: dataset.user_id || '',
