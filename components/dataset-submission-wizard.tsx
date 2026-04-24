@@ -12,10 +12,10 @@ import { Card } from '@/components/ui/card'
 import { Upload, ChevronRight, ChevronLeft, CheckCircle2, FileText, AlertCircle, Loader2, ArrowLeft } from 'lucide-react'
 import { useToast } from '@/hooks/use-toast'
 import { extractOcrInsights } from '@/lib/ocr-insights'
+import { supabaseBrowser } from '@/lib/supabase/browser'
 import {
   createDatasetDraft,
   getOwnDatasetDraft,
-  uploadDatasetFile,
   submitForOCR,
   getOCRStatus,
   getOCRResults,
@@ -268,7 +268,31 @@ export function DatasetSubmissionWizard() {
 
       setLoading(true)
       try {
-        await uploadDatasetFile(datasetId, file)
+        const supabase = supabaseBrowser()
+        const {
+          data: { user },
+        } = await supabase.auth.getUser()
+
+        if (!user) {
+          throw new Error('Not authenticated')
+        }
+
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${datasetId}-${Date.now()}.${fileExt}`
+        const filePath = `datasets/${user.id}/${fileName}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('datasets')
+          .upload(filePath, file, {
+            upsert: true,
+            contentType: file.type || undefined,
+            cacheControl: '3600',
+          })
+
+        if (uploadError) {
+          throw new Error(`File upload failed: ${uploadError.message}`)
+        }
+
         await submitForOCR(datasetId)
         setOcrStatus('queued')
         setStep(3)
