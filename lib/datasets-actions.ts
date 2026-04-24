@@ -39,6 +39,18 @@ function getOCRMaxFileBytes() {
   return parsePositiveIntEnv(process.env.OCR_MAX_FILE_BYTES, DEFAULT_OCR_MAX_FILE_BYTES)
 }
 
+function formatBytesForDisplay(value: number) {
+  if (!Number.isFinite(value) || value <= 0) {
+    return '0 B'
+  }
+
+  const units = ['B', 'KB', 'MB', 'GB']
+  const order = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1)
+  const normalized = value / Math.pow(1024, order)
+  const digits = order === 0 ? 0 : 1
+  return `${normalized.toFixed(digits)} ${units[order]}`
+}
+
 function getFileExtension(fileName: string) {
   const lower = fileName.toLowerCase()
   const parts = lower.split('.')
@@ -99,7 +111,8 @@ function normalizeOCRFailureMessage(rawMessage: string) {
   }
 
   if (lower.includes('too large') || lower.includes('maximum allowed')) {
-    return `File is too large for OCR. Maximum allowed size is ${getOCRMaxFileBytes()} bytes.`
+    const maxBytes = getOCRMaxFileBytes()
+    return `File is too large for OCR. Maximum allowed size is ${formatBytesForDisplay(maxBytes)} (${maxBytes} bytes).`
   }
 
   if (lower.includes('empty')) {
