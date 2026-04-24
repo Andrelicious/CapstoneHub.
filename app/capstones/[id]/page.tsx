@@ -27,6 +27,15 @@ function hasMissingTableError(message: string, table: string) {
   )
 }
 
+function isPermissionError(message: string) {
+  const normalized = (message || '').toLowerCase()
+  return (
+    normalized.includes('permission denied') ||
+    normalized.includes('row-level security policy') ||
+    normalized.includes('not authorized')
+  )
+}
+
 async function getCapstone(id: string) {
   const supabase = await createSupabaseServerClient()
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -126,7 +135,11 @@ async function getCapstone(id: string) {
     }
   }
 
-  if (ocrRead.error && !hasMissingTableError(ocrRead.error.message || '', 'ocr_results')) {
+  if (
+    ocrRead.error &&
+    !hasMissingTableError(ocrRead.error.message || '', 'ocr_results') &&
+    !isPermissionError(ocrRead.error.message || '')
+  ) {
     throw new Error(`Failed to load OCR detail: ${ocrRead.error.message}`)
   }
 

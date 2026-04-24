@@ -48,6 +48,15 @@ function isMissingTableError(message: string, table: string) {
   )
 }
 
+function isPermissionError(message: string) {
+  const normalized = (message || '').toLowerCase()
+  return (
+    normalized.includes('permission denied') ||
+    normalized.includes('row-level security policy') ||
+    normalized.includes('not authorized')
+  )
+}
+
 export default async function AdminReviewPage() {
   const supabase = await createSupabaseServerClient()
 
@@ -146,7 +155,10 @@ export default async function AdminReviewPage() {
           .map((row) => [row.dataset_id || row.submission_id || '', row])
           .filter(([id]) => Boolean(id))
       )
-    } else if (!isMissingTableError(ocrRead.error.message || '', 'ocr_results')) {
+    } else if (
+      !isMissingTableError(ocrRead.error.message || '', 'ocr_results') &&
+      !isPermissionError(ocrRead.error.message || '')
+    ) {
       throw new Error(`Failed to load OCR titles for admin queue: ${ocrRead.error.message}`)
     }
   }
