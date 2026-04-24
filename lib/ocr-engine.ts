@@ -81,6 +81,18 @@ function getOCRProvider(): OCRProvider {
   )
 }
 
+function isProviderConfigured(provider: OCRProvider) {
+  if (provider === 'ocr_ai') {
+    return Boolean((process.env.OCR_AI_ENDPOINT || '').trim())
+  }
+
+  if (provider === 'google_vision') {
+    return isGoogleCredentialsConfigured()
+  }
+
+  return true
+}
+
 function parseProvider(value: string): OCRProvider {
   const normalized = value.trim().toLowerCase()
   if (normalized === 'tesseract' || normalized === 'google_vision' || normalized === 'ocr_ai') {
@@ -107,15 +119,14 @@ function getProviderChain() {
   if (!chainRaw) {
     const primaryProvider = getOCRProvider()
 
-    if (primaryProvider === 'ocr_ai') {
-      return ['ocr_ai', 'google_vision', 'tesseract']
-    }
+    const candidates: OCRProvider[] =
+      primaryProvider === 'ocr_ai'
+        ? ['ocr_ai', 'google_vision', 'tesseract']
+        : primaryProvider === 'google_vision'
+          ? ['google_vision', 'tesseract']
+          : ['tesseract']
 
-    if (primaryProvider === 'google_vision') {
-      return ['google_vision', 'tesseract']
-    }
-
-    return ['tesseract']
+    return candidates.filter((provider) => isProviderConfigured(provider))
   }
 
   const seen = new Set<OCRProvider>()
@@ -131,10 +142,10 @@ function getProviderChain() {
     })
 
   if (!parsed.length) {
-    throw new Error('OCR_PROVIDER_CHAIN is empty after parsing. Provide at least one valid provider.')
+    return ['tesseract']
   }
 
-  return parsed
+  return parsed.filter((provider) => isProviderConfigured(provider))
 }
 
 function isGoogleCredentialsConfigured() {
@@ -613,6 +624,13 @@ export async function runOCR(params: {
   const allowFailover = shouldEnableProviderFailover()
   const minPdfFullTextChars = getMinPdfFullTextChars()
   const errors: string[] = []
+
+  if (!providerChain.length) {
+    return {
+      previewText: '',
+      fullText: '',
+    } satisfies OCRExtractionResult
+  }
 
   for (const provider of providerChain) {
     if (provider === 'tesseract' && sourceType === 'pdf') {
