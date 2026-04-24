@@ -293,8 +293,8 @@ export function DatasetSubmissionWizard() {
           throw new Error(`File upload failed: ${uploadError.message}`)
         }
 
-        await submitForOCR(datasetId)
-        setOcrStatus('queued')
+        const ocrSubmission = await submitForOCR(datasetId)
+        setOcrStatus(ocrSubmission?.status || 'queued')
         setStep(3)
       } catch (error: unknown) {
         toast({

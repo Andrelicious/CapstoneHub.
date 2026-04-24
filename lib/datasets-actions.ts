@@ -1080,7 +1080,7 @@ export async function submitForOCR(datasetId: string) {
   const latestStatus = (latestJob?.status || '').toString().toLowerCase()
 
   if (latestStatus === 'queued' || latestStatus === 'processing') {
-    return { success: true }
+    return { success: true, status: latestStatus }
   }
 
   // Update dataset status to ocr_processing
@@ -1120,12 +1120,14 @@ export async function submitForOCR(datasetId: string) {
       providerHint: process.env.OCR_PROVIDER_CHAIN || process.env.OCR_PROVIDER || 'default',
       errorMessage: message,
     })
-    throw new Error(message)
+    // OCR failure should not block the submission wizard flow.
+    // The UI can continue to Step 3/4 and let admins review via uploaded file.
+    return { success: true, status: 'failed', message }
   }
 
   revalidateTag('datasets')
   revalidateTag(`dataset-${datasetId}`)
-  return { success: true }
+  return { success: true, status: 'done' }
 }
 
 /**
