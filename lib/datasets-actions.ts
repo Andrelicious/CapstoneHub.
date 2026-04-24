@@ -1754,3 +1754,102 @@ export async function getDatasetById(datasetId: string) {
 
   return dataset
 }
+
+type WizardActionResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: string }
+
+function toWizardActionError(error: unknown, fallbackMessage: string) {
+  if (error instanceof Error && error.message?.trim()) {
+    return error.message
+  }
+
+  const maybeMessage = (error as { message?: unknown })?.message
+  if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
+    return maybeMessage
+  }
+
+  return fallbackMessage
+}
+
+export async function getOwnDatasetDraftSafe(datasetId: string): Promise<WizardActionResult<any>> {
+  try {
+    const draft = await getOwnDatasetDraft(datasetId)
+    return { ok: true, data: draft }
+  } catch (error: unknown) {
+    return { ok: false, error: toWizardActionError(error, 'Unable to load draft.') }
+  }
+}
+
+export async function createDatasetDraftSafe(data: {
+  title: string
+  description?: string
+  program: string
+  doc_type: string
+  school_year: string
+  category?: string
+  tags?: string[]
+}): Promise<WizardActionResult<any>> {
+  try {
+    const draft = await createDatasetDraft(data)
+    return { ok: true, data: draft }
+  } catch (error: unknown) {
+    return { ok: false, error: toWizardActionError(error, 'Unable to create draft.') }
+  }
+}
+
+export async function updateDatasetDraftSafe(
+  datasetId: string,
+  data: {
+    title: string
+    description?: string
+    program: string
+    doc_type: string
+    school_year: string
+    category?: string
+    tags?: string[]
+  }
+): Promise<WizardActionResult<any>> {
+  try {
+    const draft = await updateDatasetDraft(datasetId, data)
+    return { ok: true, data: draft }
+  } catch (error: unknown) {
+    return { ok: false, error: toWizardActionError(error, 'Unable to update draft.') }
+  }
+}
+
+export async function submitForOCRSafe(datasetId: string): Promise<WizardActionResult<any>> {
+  try {
+    const result = await submitForOCR(datasetId)
+    return { ok: true, data: result }
+  } catch (error: unknown) {
+    return { ok: false, error: toWizardActionError(error, 'Unable to start OCR processing.') }
+  }
+}
+
+export async function getOCRStatusSafe(datasetId: string): Promise<WizardActionResult<any>> {
+  try {
+    const result = await getOCRStatus(datasetId)
+    return { ok: true, data: result }
+  } catch (error: unknown) {
+    return { ok: false, error: toWizardActionError(error, 'Unable to get OCR status.') }
+  }
+}
+
+export async function getOCRResultsSafe(datasetId: string): Promise<WizardActionResult<any>> {
+  try {
+    const result = await getOCRResults(datasetId)
+    return { ok: true, data: result }
+  } catch (error: unknown) {
+    return { ok: false, error: toWizardActionError(error, 'Unable to get OCR results.') }
+  }
+}
+
+export async function submitForAdminReviewSafe(datasetId: string): Promise<WizardActionResult<any>> {
+  try {
+    const result = await submitForAdminReview(datasetId)
+    return { ok: true, data: result }
+  } catch (error: unknown) {
+    return { ok: false, error: toWizardActionError(error, 'Unable to submit for admin review.') }
+  }
+}

@@ -14,13 +14,13 @@ import { useToast } from '@/hooks/use-toast'
 import { extractOcrInsights } from '@/lib/ocr-insights'
 import { supabaseBrowser } from '@/lib/supabase/browser'
 import {
-  createDatasetDraft,
-  getOwnDatasetDraft,
-  submitForOCR,
-  getOCRStatus,
-  getOCRResults,
-  submitForAdminReview,
-  updateDatasetDraft,
+  createDatasetDraftSafe,
+  getOwnDatasetDraftSafe,
+  submitForOCRSafe,
+  getOCRStatusSafe,
+  getOCRResultsSafe,
+  submitForAdminReviewSafe,
+  updateDatasetDraftSafe,
 } from '@/lib/datasets-actions'
 
 type WizardStep = 1 | 2 | 3 | 4 | 5
@@ -50,6 +50,9 @@ function getReadableErrorMessage(error: unknown) {
   if (typeof error === 'string') return error
   if (error instanceof Error && error.message?.trim()) {
     const normalized = error.message.toLowerCase()
+    if (normalized.includes('an error occurred in the server components render')) {
+      return 'Submission request failed on the server. Please retry. If this keeps happening, contact support with the time of failure.'
+    }
     if (normalized.includes('an unexpected response was received from the server')) {
       return 'The server returned an unexpected response. Please try again. If the file is large, retry with a smaller file and check deployment logs.'
     }
@@ -62,6 +65,9 @@ function getReadableErrorMessage(error: unknown) {
   const maybeMessage = (error as { message?: unknown })?.message
   if (typeof maybeMessage === 'string' && maybeMessage.trim()) {
     const normalized = maybeMessage.toLowerCase()
+    if (normalized.includes('an error occurred in the server components render')) {
+      return 'Submission request failed on the server. Please retry. If this keeps happening, contact support with the time of failure.'
+    }
     if (normalized.includes('an unexpected response was received from the server')) {
       return 'The server returned an unexpected response. Please try again. If the file is large, retry with a smaller file and check deployment logs.'
     }
@@ -109,8 +115,14 @@ export function DatasetSubmissionWizard() {
 
     const loadDraft = async () => {
       try {
-        const draft = await getOwnDatasetDraft(draftIdFromQuery)
+        const draftResult = await getOwnDatasetDraftSafe(draftIdFromQuery)
         if (!active) return
+
+        if (!draftResult.ok) {
+          throw new Error(draftResult.error)
+        }
+
+        const draft = draftResult.data
 
         setDatasetId(draft.id)
         setFormData({
@@ -151,16 +163,18 @@ export function DatasetSubmissionWizard() {
 
     const refreshOCRState = async () => {
       try {
-        const job = await getOCRStatus(datasetId)
+        const statusResult = await getOCRStatusSafe(datasetId)
         if (!active) return
+
+        const job = statusResult.ok ? statusResult.data : null
 
         const status = job?.status || 'processing'
         setOcrStatus(status)
 
         if (status === 'done') {
-          const results = await getOCRResults(datasetId)
+          const resultsResult = await getOCRResultsSafe(datasetId)
           if (!active) return
-          setOcrResults(results)
+          setOcrResults(resultsResult.ok ? resultsResult.data : null)
         }
       } catch {
         if (active) {
@@ -239,9 +253,16 @@ export function DatasetSubmissionWizard() {
         }
 
         if (datasetId) {
-          await updateDatasetDraft(datasetId, payload)
+          const updateResult = await updateDatasetDraftSafe(datasetId, payload)
+          if (!updateResult.ok) {
+            throw new Error(updateResult.error)
+          }
         } else {
-          const dataset = await createDatasetDraft(payload)
+          const createResult = await createDatasetDraftSafe(payload)
+          if (!createResult.ok) {
+            throw new Error(createResult.error)
+          }
+          const dataset = createResult.data
           setDatasetId(dataset.id)
         }
 
@@ -303,7 +324,11 @@ export function DatasetSubmissionWizard() {
           throw new Error(`File upload failed: ${uploadError.message}`)
         }
 
-        const ocrSubmission = await submitForOCR(datasetId)
+        const ocrSubmissionResult = await submitForOCRSafe(datasetId)
+        if (!ocrSubmissionResult.ok) {
+          throw new Error(ocrSubmissionResult.error)
+        }
+        const ocrSubmission = ocrSubmissionResult.data
         setOcrStatus(ocrSubmission?.status || 'queued')
         setStep(3)
       } catch (error: unknown) {
@@ -332,20 +357,24 @@ export function DatasetSubmissionWizard() {
         // Poll OCR status with bounded retries
         const maxPolls = 20
         let polls = 0
-        let job = await getOCRStatus(datasetId)
+        const firstStatus = await getOCRStatusSafe(datasetId)
+        let job = firstStatus.ok ? firstStatus.data : null
         while (polls < maxPolls && job?.status !== 'done' && job?.status !== 'failed') {
           await new Promise((resolve) => setTimeout(resolve, 1000))
-          job = await getOCRStatus(datasetId)
+          const nextStatus = await getOCRStatusSafe(datasetId)
+          job = nextStatus.ok ? nextStatus.data : null
           setOcrStatus(job?.status || 'processing')
           polls += 1
         }
 
         if (job?.status === 'done') {
-          const results = await getOCRResults(datasetId)
+          const resultsResult = await getOCRResultsSafe(datasetId)
+          const results = resultsResult.ok ? resultsResult.data : null
           setOcrResults(results)
           setStep(4)
         } else if (job?.status === 'failed') {
-          const results = await getOCRResults(datasetId).catch(() => null)
+          const failedResults = await getOCRResultsSafe(datasetId)
+          const results = failedResults.ok ? failedResults.data : null
           setOcrResults(results)
           toast({
             title: 'OCR failed',
@@ -353,7 +382,8 @@ export function DatasetSubmissionWizard() {
           })
           setStep(4)
         } else {
-          const results = await getOCRResults(datasetId)
+          const resultsResult = await getOCRResultsSafe(datasetId)
+          const results = resultsResult.ok ? resultsResult.data : null
           setOcrResults(results)
           toast({
             title: 'OCR still processing',
@@ -383,7 +413,10 @@ export function DatasetSubmissionWizard() {
 
       setLoading(true)
       try {
-        await submitForAdminReview(datasetId)
+        const submitResult = await submitForAdminReviewSafe(datasetId)
+        if (!submitResult.ok) {
+          throw new Error(submitResult.error)
+        }
         toast({
           title: 'Success',
           description: 'Submission sent and now pending admin review',
