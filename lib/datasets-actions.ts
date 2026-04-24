@@ -901,6 +901,10 @@ export async function deleteOwnDataset(datasetId: string) {
  */
 export async function restoreOwnDataset(datasetId: string) {
   const supabase = await createSupabaseServerClient()
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const serviceClient = serviceRoleKey
+    ? await createSupabaseServerClient({ supabaseKey: serviceRoleKey })
+    : null
 
   const {
     data: { user },
@@ -932,7 +936,18 @@ export async function restoreOwnDataset(datasetId: string) {
     .eq('user_id', user.id)
     .not('deleted_at', 'is', null)
 
-  if (restoreResult.error) {
+  if (restoreResult.error && isPermissionError(restoreResult.error.message || '') && serviceClient) {
+    const serviceRestoreResult = await serviceClient
+      .from('datasets')
+      .update({ deleted_at: null })
+      .eq('id', datasetId)
+      .eq('user_id', user.id)
+      .not('deleted_at', 'is', null)
+
+    if (serviceRestoreResult.error) {
+      throw new Error(`Failed to restore submission: ${serviceRestoreResult.error.message}`)
+    }
+  } else if (restoreResult.error) {
     throw new Error(`Failed to restore submission: ${restoreResult.error.message}`)
   }
 
@@ -941,6 +956,16 @@ export async function restoreOwnDataset(datasetId: string) {
   revalidatePath('/student/dashboard')
   revalidatePath('/student/trash')
   return { success: true }
+}
+
+export async function restoreOwnDatasetSafe(datasetId: string): Promise<{ success: true } | { success: false; error: string }> {
+  try {
+    const result = await restoreOwnDataset(datasetId)
+    return result
+  } catch (error: unknown) {
+    const message = toWizardActionError(error, 'Failed to restore submission.')
+    return { success: false, error: message }
+  }
 }
 
 /**
