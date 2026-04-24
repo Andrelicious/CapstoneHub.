@@ -2,7 +2,6 @@
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { revalidateTag as nextRevalidateTag, revalidatePath as nextRevalidatePath } from 'next/cache'
-import { runOCR } from '@/lib/ocr-engine'
 import { extractOcrInsights } from '@/lib/ocr-insights'
 
 const revalidateTag = (tag: string) => nextRevalidateTag(tag, 'max')
@@ -533,6 +532,12 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
 
   const fileBuffer = Buffer.from(await download.data.arrayBuffer())
 
+  // Load OCR engine only when OCR is actually executed so draft/admin flows stay resilient.
+  const { runOCR } = await import('@/lib/ocr-engine').catch((error: unknown) => {
+    const message = error instanceof Error ? error.message : String(error)
+    throw new Error(`OCR runtime initialization failed: ${message}`)
+  })
+
   const ocrResult = await runOCR({
     fileBuffer,
     filePath: resolved.fileName || resolved.filePath,
@@ -994,6 +999,9 @@ export async function updateDatasetDraft(
   if (error || !dataset) {
     if (error && isDuplicateConstraintError(error.message || '')) {
       throw new Error('Duplicate submission detected. A similar submission already exists in the system.')
+    }
+    if (!error && !dataset) {
+      throw new Error('This submission is no longer editable. Please start a new draft.')
     }
     throw new Error(`Failed to update draft: ${error?.message || 'Unknown error'}`)
   }

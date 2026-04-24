@@ -257,6 +257,16 @@ export function DatasetSubmissionWizard() {
       }
     } else if (step === 2) {
       // Upload file
+      if (!datasetId) {
+        toast({
+          title: 'Error',
+          description: 'Submission session was lost. Please return to Step 1 and try again.',
+          variant: 'destructive',
+        })
+        setStep(1)
+        return
+      }
+
       if (!file) {
         toast({
           title: 'Error',
@@ -307,6 +317,16 @@ export function DatasetSubmissionWizard() {
       }
     } else if (step === 3) {
       // Poll OCR status
+      if (!datasetId) {
+        toast({
+          title: 'Error',
+          description: 'Submission session was lost. Please return to Step 1 and try again.',
+          variant: 'destructive',
+        })
+        setStep(1)
+        return
+      }
+
       setLoading(true)
       try {
         // Poll OCR status with bounded retries
