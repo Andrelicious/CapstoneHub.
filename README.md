@@ -27,6 +27,7 @@ CapstoneHub now supports an OCR provider switch:
 - `OCR_PROVIDER=tesseract` (default)
 - `OCR_PROVIDER=google_vision`
 - `OCR_PROVIDER=ocr_ai`
+- `OCR_PROVIDER_CHAIN=tesseract` (recommended no-hassle setup)
 - `OCR_PROVIDER_CHAIN=ocr_ai,google_vision,tesseract` (optional priority order)
 - `OCR_ENABLE_PROVIDER_FAILOVER=true` (default)
 - `OCR_PDF_FALLBACK_TO_GOOGLE_VISION=true` (default)
@@ -49,9 +50,9 @@ Behavior:
 
 Recommended architecture:
 
-- Set `OCR_PROVIDER_CHAIN=ocr_ai,google_vision,tesseract`.
+- Set `OCR_PROVIDER_CHAIN=tesseract` if you want the simplest deployment.
 - Keep `OCR_ENABLE_PROVIDER_FAILOVER=true` for high availability.
-- Use OCR AI as primary, Google Vision as resilience fallback, and Tesseract as local fallback for image/docx.
+- Use Tesseract as the primary provider and add Google Vision only if you need better PDF/image resilience.
 
 Production go-live:
 

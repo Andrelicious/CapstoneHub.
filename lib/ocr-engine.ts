@@ -70,7 +70,7 @@ function getOCRAiEndpoint() {
 }
 
 function getOCRProvider(): OCRProvider {
-  const rawProvider = (process.env.OCR_PROVIDER || 'ocr_ai').trim().toLowerCase()
+  const rawProvider = (process.env.OCR_PROVIDER || 'tesseract').trim().toLowerCase()
 
   if (rawProvider === 'google_vision' || rawProvider === 'tesseract' || rawProvider === 'ocr_ai') {
     return rawProvider
