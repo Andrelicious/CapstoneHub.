@@ -1,7 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { restoreOwnDataset } from '@/lib/datasets-actions'
 import { getCurrentProfileServer } from '@/lib/profile-server'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -13,17 +12,6 @@ type TrashDataset = {
   program: string
   school_year: string
   deleted_at: string | null
-}
-
-async function restoreRemovedSubmission(formData: FormData) {
-  'use server'
-
-  const datasetId = String(formData.get('datasetId') || '').trim()
-  if (!datasetId) {
-    throw new Error('Missing submission id.')
-  }
-
-  await restoreOwnDataset(datasetId)
 }
 
 function formatRelativePurgeDate(deletedAt: string | null | undefined) {
@@ -43,8 +31,13 @@ function formatRelativePurgeDate(deletedAt: string | null | undefined) {
   return `${remainingDays} day${remainingDays === 1 ? '' : 's'} until permanent deletion`
 }
 
-export default async function StudentTrashPage() {
+type StudentTrashPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}
+
+export default async function StudentTrashPage({ searchParams }: StudentTrashPageProps) {
   const supabase = await createSupabaseServerClient()
+  const resolvedSearchParams = (await searchParams) || {}
 
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
@@ -73,6 +66,8 @@ export default async function StudentTrashPage() {
   const removedDatasets: TrashDataset[] = removedQuery.data || []
   const displayName = profile?.display_name || user.email?.split('@')[0] || 'Student'
   const currentTimeMs = Number(new Date())
+  const restoreError = typeof resolvedSearchParams.restoreError === 'string' ? resolvedSearchParams.restoreError : ''
+  const restored = resolvedSearchParams.restored === '1'
 
   return (
     <div className="relative pt-32 pb-20">
@@ -109,6 +104,18 @@ export default async function StudentTrashPage() {
             </Badge>
           </div>
 
+          {restored && (
+            <div className="mb-4 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+              Submission restored successfully.
+            </div>
+          )}
+
+          {restoreError && (
+            <div className="mb-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
+              {restoreError}
+            </div>
+          )}
+
           {removedDatasets.length === 0 ? (
             <div className="text-center py-12">
               <Trash2 className="w-12 h-12 text-gray-600 mx-auto mb-4" />
@@ -140,7 +147,7 @@ export default async function StudentTrashPage() {
                     </div>
                     <div className="flex gap-2">
                       {canRestore && (
-                        <form action={restoreRemovedSubmission}>
+                        <form method="post" action="/api/student/trash/restore">
                           <input type="hidden" name="datasetId" value={dataset.id} />
                           <Button type="submit" variant="outline" size="sm" className="bg-card border-border text-foreground hover:bg-accent">
                             <ArchiveRestore className="w-4 h-4 mr-1" />
