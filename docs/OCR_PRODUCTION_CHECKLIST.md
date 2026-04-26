@@ -4,32 +4,25 @@ Use this checklist before enabling OCR in production.
 
 ## 1) Environment and Secret Wiring
 
-- Set `OCR_PROVIDER_CHAIN=ocr_ai,google_vision,tesseract`
-- Set `OCR_ENABLE_PROVIDER_FAILOVER=true`
+- Set `OCR_PROVIDER_CHAIN=tesseract`
+- Set `OCR_ENABLE_PROVIDER_FAILOVER=false`
 - Set `OCR_MAX_FILE_BYTES=20971520` (or your policy limit)
-- Set `OCR_AI_ENDPOINT` to your deployed OCR service URL
-- Set `OCR_AI_API_KEY` if your OCR service requires bearer authentication
-- Set `OCR_AI_TIMEOUT_MS` and `OCR_AI_MAX_RETRIES` for your latency/SLA profile
-- Configure Google fallback credentials (`GOOGLE_APPLICATION_CREDENTIALS` or `GOOGLE_VISION_CREDENTIALS_JSON`)
-- If tesseract fallback is not installed in your runtime, remove it from the chain (for example: `OCR_PROVIDER_CHAIN=ocr_ai,google_vision`).
+- Set `OCR_TESSERACT_LANG=eng`
+- Set `OCR_TESSERACT_TIMEOUT_MS=120000` (or your latency/SLA profile)
+- Do not set Google Vision or OCR AI credentials for this rollout.
 
 ## 2) Endpoint Contract Validation
 
-Run a direct endpoint contract check before app-level testing:
+Run a local OCR smoke test before app-level testing:
 
 ```bash
-pnpm ocr:verify-ai --file public/apple-icon.png
+pnpm build
 ```
-
-Optional flags:
-
-- `--endpoint https://your-ocr-ai-service/ocr`
-- `--api-key your_token`
 
 Pass criteria:
 
-- HTTP 2xx response
-- JSON response contains either `fullText` or `text` as a non-empty string
+- Build completes successfully
+- Tesseract-only OCR code path loads without provider fallback errors
 
 ## 3) App-Level Validation
 
@@ -40,8 +33,8 @@ Pass criteria:
 
 ## 4) Failover Validation
 
-- Temporarily disable OCR AI endpoint and verify fallback provider succeeds
-- Temporarily disable failover (`OCR_ENABLE_PROVIDER_FAILOVER=false`) and confirm clear single-provider error output
+- Confirm failover is disabled and the app still returns clear Tesseract-only messages when OCR cannot read a file
+- Confirm no Google Vision or OCR AI credentials are present in production env for this rollout
 
 ## 5) Monitoring and Operations
 

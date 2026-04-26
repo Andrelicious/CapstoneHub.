@@ -105,11 +105,6 @@ function parseProvider(value: string): OCRProvider {
   )
 }
 
-function shouldFallbackPdfToGoogleVision() {
-  const value = (process.env.OCR_PDF_FALLBACK_TO_GOOGLE_VISION || 'true').trim().toLowerCase()
-  return value !== 'false' && value !== '0' && value !== 'no'
-}
-
 function shouldEnableProviderFailover() {
   const value = (process.env.OCR_ENABLE_PROVIDER_FAILOVER || 'true').trim().toLowerCase()
   return value !== 'false' && value !== '0' && value !== 'no'
@@ -645,79 +640,22 @@ export async function runOCR(params: {
 }) {
   validateOCRInput(params)
 
-  const mimeType = inferMimeType(params.filePath, params.mimeType)
-  const sourceType = detectSourceType(params.filePath, mimeType)
-  const providerChain = getProviderChain()
-  const allowFailover = shouldEnableProviderFailover()
-  const minPdfFullTextChars = getMinPdfFullTextChars()
-  const errors: string[] = []
+  const tesseractResult = await runTesseractOCR({
+    ...params,
+    mimeType: inferMimeType(params.filePath, params.mimeType),
+  })
 
-  if (!providerChain.length) {
-    return {
-      previewText: '',
-      fullText: '',
-    } satisfies OCRExtractionResult
+  const normalizedFullText = normalizeText(tesseractResult.fullText)
+
+  if (!normalizedFullText.trim()) {
+    throw new Error(
+      'Tesseract OCR produced no readable text. For scanned PDFs, use a searchable PDF or image capture, or re-upload a clearer document.'
+    )
   }
 
-  for (const provider of providerChain) {
-    try {
-      let result: OCRExtractionResult
-
-      if (provider === 'google_vision') {
-        result = await runGoogleVisionOCR({ ...params, mimeType })
-      } else if (provider === 'ocr_ai') {
-        result = await runOCRAiPipeline({ ...params, mimeType })
-      } else {
-        result = await runTesseractOCR({ ...params, mimeType })
-      }
-
-      const normalizedFullText = normalizeText(result.fullText)
-      const isEmptyPdfResult = sourceType === 'pdf' && normalizedFullText.length === 0
-      const isLowQualityPdfResult =
-        sourceType === 'pdf' &&
-        normalizedFullText.length > 0 &&
-        normalizedFullText.length < minPdfFullTextChars
-
-      if (isEmptyPdfResult && shouldFallbackPdfToGoogleVision() && isGoogleCredentialsConfigured()) {
-        try {
-          return await runGoogleVisionOCR({ ...params, mimeType })
-        } catch (error: unknown) {
-          const fallbackMessage = error instanceof Error ? error.message : String(error)
-          errors.push(`google_vision(fallback): ${fallbackMessage}`)
-        }
-      }
-
-      if (isEmptyPdfResult) {
-        errors.push(`${provider}: no extractable text found in PDF`) 
-        if (!allowFailover) {
-          break
-        }
-        continue
-      }
-
-      if (isLowQualityPdfResult && allowFailover) {
-        errors.push(
-          `${provider}: partial PDF OCR (${normalizedFullText.length} chars, minimum ${minPdfFullTextChars})`
-        )
-        continue
-      }
-
-      return {
-        ...result,
-        fullText: normalizedFullText,
-        previewText: buildPreview(normalizedFullText),
-      }
-    } catch (error: unknown) {
-      const message = error instanceof Error ? error.message : String(error)
-      errors.push(`${provider}: ${message}`)
-
-      if (!allowFailover) {
-        break
-      }
-    }
+  return {
+    ...tesseractResult,
+    fullText: normalizedFullText,
+    previewText: buildPreview(normalizedFullText),
   }
-
-  throw new Error(
-    `OCR failed for all configured providers. Attempted chain: ${providerChain.join(', ')}. Details: ${errors.join(' | ')}`
-  )
 }

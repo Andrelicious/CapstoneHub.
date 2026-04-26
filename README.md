@@ -22,50 +22,33 @@
 
 ## OCR Setup
 
-CapstoneHub now supports an OCR provider switch:
+CapstoneHub production OCR is Tesseract-only.
 
-- `OCR_PROVIDER=tesseract` (default)
-- `OCR_PROVIDER=google_vision`
-- `OCR_PROVIDER=ocr_ai`
-- `OCR_PROVIDER_CHAIN=tesseract` (recommended no-hassle setup)
-- `OCR_PROVIDER_CHAIN=ocr_ai,google_vision,tesseract` (optional priority order)
-- `OCR_ENABLE_PROVIDER_FAILOVER=true` (default)
-- `OCR_PDF_FALLBACK_TO_GOOGLE_VISION=true` (default)
+- `OCR_PROVIDER_CHAIN=tesseract` (required for deployment)
+- `OCR_ENABLE_PROVIDER_FAILOVER=false` (recommended)
 - `OCR_TESSERACT_LANG=eng`
 - `OCR_MAX_FILE_BYTES=20971520` (default 20MB)
 - `OCR_TESSERACT_TIMEOUT_MS=120000` (default 120s)
-- `OCR_AI_ENDPOINT=https://your-ocr-ai-service/ocr`
-- `OCR_AI_API_KEY=...` (optional bearer token)
-- `OCR_AI_TIMEOUT_MS=120000` (default 120s)
-- `OCR_AI_MAX_RETRIES=2` (default)
 
 Behavior:
 
 - `docx` always uses direct text extraction.
-- `image` uses the selected provider.
-- `pdf` with `OCR_PROVIDER=tesseract` will automatically fall back to Google Vision when credentials are configured.
-- `OCR_PROVIDER=ocr_ai` sends image/pdf files to your OCR AI service endpoint and expects JSON with `fullText` or `text`.
-- If PDF fallback is disabled and provider is `tesseract`, OCR will fail with a clear configuration error.
+- `image` and `pdf` are processed by Tesseract-only OCR.
+- Searchable PDFs use their embedded text layer first.
+- Scanned PDFs that do not yield readable text will fail with a clear Tesseract-only message.
 - OCR rejects unsupported file formats and empty/oversized uploads before processing.
 
 Recommended architecture:
 
 - Set `OCR_PROVIDER_CHAIN=tesseract` if you want the simplest deployment.
-- Keep `OCR_ENABLE_PROVIDER_FAILOVER=true` for high availability.
-- Use Tesseract as the primary provider and add Google Vision only if you need better PDF/image resilience.
+- Set `OCR_ENABLE_PROVIDER_FAILOVER=false` so production behavior stays deterministic.
+- Do not configure Google Vision or OCR AI for this rollout.
 
 Production go-live:
 
 - Follow `docs/OCR_PRODUCTION_CHECKLIST.md`.
-- Validate OCR AI endpoint contract quickly with:
-   - `pnpm ocr:verify-ai --file public/apple-icon.png`
-
-If you use Google Vision, configure one of the following in `.env.local`:
-
-- `GOOGLE_APPLICATION_CREDENTIALS=C:\path\to\service-account.json`
-- `GOOGLE_VISION_CREDENTIALS_JSON={"type":"service_account",...}` (single-line JSON)
-
-Then restart the dev server.
+- Validate a local OCR smoke test before deploy.
+- Confirm the Vercel deployment uses the same Tesseract-only env values as localhost.
 
 For CapstoneHub OCR results, only extracted text is stored (no OCR metadata fields are required).
 
