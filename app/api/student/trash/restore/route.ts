@@ -17,5 +17,5 @@ export async function POST(request: Request) {
     )
   }
 
-  return NextResponse.redirect(new URL('/student/trash?restored=1', request.url))
+  return NextResponse.redirect(new URL('/student/dashboard?restored=1', request.url))
 }

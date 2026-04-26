@@ -35,8 +35,13 @@ const statusConfig = {
   rejected: { icon: XCircle, color: 'text-red-400', bgColor: 'bg-red-500/20 border-red-500/30', label: 'Rejected' },
 }
 
-export default async function StudentDashboardPage() {
+type StudentDashboardPageProps = {
+  searchParams?: Promise<Record<string, string | string[] | undefined>>
+}
+
+export default async function StudentDashboardPage({ searchParams }: StudentDashboardPageProps) {
   const supabase = await createSupabaseServerClient()
+  const resolvedSearchParams = (await searchParams) || {}
 
   // Check authentication & role
   const { data: { user } } = await supabase.auth.getUser()
@@ -60,6 +65,7 @@ export default async function StudentDashboardPage() {
   }
 
   const displayName = profile?.display_name || user.email?.split('@')[0] || 'Student'
+  const restored = resolvedSearchParams.restored === '1'
 
   // Fetch student's own submissions
   let submissions: any[] | null = null
@@ -122,6 +128,11 @@ export default async function StudentDashboardPage() {
               </Button>
             </Link>
           </div>
+          {restored && (
+            <div className="mt-4 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+              Submission restored to your Draft area successfully.
+            </div>
+          )}
         </div>
 
         {/* Quick Actions */}

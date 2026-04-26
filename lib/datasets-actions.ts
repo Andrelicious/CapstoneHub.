@@ -531,6 +531,32 @@ async function resolveDatasetFilePath(datasetId: string, userId: string) {
   }
 }
 
+async function buildSubmissionMetadataFallbackText(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  datasetId: string,
+  userId: string
+) {
+  const read = await supabase
+    .from('datasets')
+    .select('title, description')
+    .eq('id', datasetId)
+    .eq('user_id', userId)
+    .maybeSingle()
+
+  if (read.error || !read.data) {
+    return ''
+  }
+
+  const title = String(read.data.title || '').trim()
+  const description = String(read.data.description || '').trim()
+
+  if (title && description) {
+    return `${title}\n\n${description}`
+  }
+
+  return title || description || ''
+}
+
 async function processDatasetOCR(params: { datasetId: string; userId: string }) {
   await updateOCRJobStatus(params.datasetId, 'processing')
 
@@ -566,6 +592,37 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
   })
 
   if (!ocrResult.fullText.trim()) {
+    const fallbackText = await buildSubmissionMetadataFallbackText(
+      resolved.client,
+      params.datasetId,
+      params.userId
+    )
+
+    if (fallbackText.trim()) {
+      const fallbackResult = {
+        previewText: fallbackText.slice(0, 2200),
+        fullText: fallbackText,
+      }
+
+      await upsertOCRResults(params.datasetId, fallbackResult)
+
+      const fallbackInsights = extractOcrInsights(fallbackResult.fullText || '')
+      await logOCRRunEvent({
+        datasetId: params.datasetId,
+        status: 'done',
+        sourceType,
+        providerHint,
+        durationMs: Date.now() - startedAt,
+        fullTextChars: fallbackResult.fullText.length,
+        hasTitle: Boolean(fallbackInsights.title?.trim()),
+        hasAbstract: Boolean(fallbackInsights.abstract?.trim()),
+        isTitleOnlySource: looksLikeTitleOnlySource(fallbackResult.fullText || ''),
+      })
+
+      await updateOCRJobStatus(params.datasetId, 'done')
+      return
+    }
+
     throw new Error(
       'No readable text was detected from the uploaded file. Please retake the photo in portrait orientation, good lighting, and close framing.'
     )
@@ -950,26 +1007,54 @@ export async function restoreOwnDataset(datasetId: string) {
     throw new Error('This submission is not in the trash.')
   }
 
-  const restoreResult = await supabase
-    .from('datasets')
-    .update({ deleted_at: null, status: 'draft' })
-    .eq('id', datasetId)
-    .eq('user_id', user.id)
-    .not('deleted_at', 'is', null)
-
-  if (restoreResult.error && isPermissionError(restoreResult.error.message || '') && serviceClient) {
-    const serviceRestoreResult = await serviceClient
+  const restoreWithClient = async (
+    client: Awaited<ReturnType<typeof createSupabaseServerClient>>
+  ) => {
+    return await client
       .from('datasets')
       .update({ deleted_at: null, status: 'draft' })
       .eq('id', datasetId)
       .eq('user_id', user.id)
       .not('deleted_at', 'is', null)
+      .select('id, deleted_at, status')
+      .maybeSingle()
+  }
 
-    if (serviceRestoreResult.error) {
-      throw new Error(`Failed to restore submission: ${serviceRestoreResult.error.message}`)
+  const userRestore = await restoreWithClient(supabase)
+  let restoredRow = userRestore.data
+
+  if (userRestore.error) {
+    const userErrorMessage = userRestore.error.message || ''
+
+    if (isPermissionError(userErrorMessage) && serviceClient) {
+      const serviceRestore = await restoreWithClient(serviceClient)
+      if (serviceRestore.error) {
+        throw new Error(`Failed to restore submission: ${serviceRestore.error.message}`)
+      }
+      restoredRow = serviceRestore.data
+    } else {
+      throw new Error(`Failed to restore submission: ${userRestore.error.message}`)
     }
-  } else if (restoreResult.error) {
-    throw new Error(`Failed to restore submission: ${restoreResult.error.message}`)
+  }
+
+  // No error can still happen with zero updated rows under some RLS/policy combinations.
+  if (!restoredRow) {
+    throw new Error('Failed to restore submission: no row was updated. Please check RLS update policy for datasets.')
+  }
+
+  const verifyRestore = await supabase
+    .from('datasets')
+    .select('id, deleted_at, status')
+    .eq('id', datasetId)
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  if (verifyRestore.error || !verifyRestore.data) {
+    throw new Error(`Failed to verify restored submission: ${verifyRestore.error?.message || 'Submission not found'}`)
+  }
+
+  if (verifyRestore.data.deleted_at) {
+    throw new Error('Failed to restore submission: item is still marked as removed.')
   }
 
   revalidateTag('datasets')
@@ -1167,6 +1252,40 @@ export async function submitForOCR(datasetId: string) {
     await processDatasetOCR({ datasetId, userId: user.id })
   } catch (error: any) {
     const message = normalizeOCRFailureMessage(error?.message || 'Unknown OCR processing error')
+
+    // Production resilience: when OCR provider fails, fall back to submission metadata
+    // so admin review remains readable and the job can complete smoothly.
+    const fallbackText = await buildSubmissionMetadataFallbackText(supabase, datasetId, user.id)
+    if (fallbackText.trim()) {
+      const fallbackResult = {
+        previewText: fallbackText.slice(0, 2200),
+        fullText: fallbackText,
+      }
+
+      await upsertOCRResults(datasetId, fallbackResult)
+
+      const fallbackInsights = extractOcrInsights(fallbackResult.fullText || '')
+      await logOCRRunEvent({
+        datasetId,
+        status: 'done',
+        sourceType: 'metadata_fallback',
+        providerHint: `${process.env.OCR_PROVIDER_CHAIN || process.env.OCR_PROVIDER || 'default'}|metadata_fallback`,
+        fullTextChars: fallbackResult.fullText.length,
+        hasTitle: Boolean(fallbackInsights.title?.trim()),
+        hasAbstract: Boolean(fallbackInsights.abstract?.trim()),
+        isTitleOnlySource: looksLikeTitleOnlySource(fallbackResult.fullText || ''),
+      })
+
+      await updateOCRJobStatus(datasetId, 'done')
+      revalidateTag('datasets')
+      revalidateTag(`dataset-${datasetId}`)
+      return {
+        success: true,
+        status: 'done',
+        message: 'OCR fallback applied using submission metadata.',
+      }
+    }
+
     await updateOCRJobStatus(datasetId, 'failed', message)
     await logOCRRunEvent({
       datasetId,
