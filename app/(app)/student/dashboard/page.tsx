@@ -232,7 +232,7 @@ export default async function StudentDashboardPage() {
                           </Button>
                         </form>
                       )}
-                      {dataset.status === 'draft' && (
+                      {dataset.normalizedStatus === 'draft' && (
                         <Link href={`/submit?draft=${dataset.id}`}>
                           <Button variant="outline" size="sm" className="bg-card border-border text-foreground hover:bg-accent">
                             Resume Draft

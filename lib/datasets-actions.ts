@@ -135,6 +135,14 @@ function normalizeOCRFailureMessage(rawMessage: string) {
     return 'Tesseract fallback is unavailable in this deployment. Install tesseract.js and redeploy, or remove tesseract from OCR_PROVIDER_CHAIN.'
   }
 
+  if (lower.includes('no extractable text found in pdf')) {
+    return 'No machine-readable text was found in this PDF. Upload a searchable PDF or image/DOCX copy for OCR.'
+  }
+
+  if (lower.includes('pdf is not supported directly for this provider')) {
+    return 'PDF OCR is unavailable for the active provider configuration. Add a PDF-capable provider (e.g., google_vision) or upload DOCX/images.'
+  }
+
   return sanitizedMessage || 'OCR processing failed. Please try again.'
 }
 
@@ -944,7 +952,7 @@ export async function restoreOwnDataset(datasetId: string) {
 
   const restoreResult = await supabase
     .from('datasets')
-    .update({ deleted_at: null })
+    .update({ deleted_at: null, status: 'draft' })
     .eq('id', datasetId)
     .eq('user_id', user.id)
     .not('deleted_at', 'is', null)
@@ -952,7 +960,7 @@ export async function restoreOwnDataset(datasetId: string) {
   if (restoreResult.error && isPermissionError(restoreResult.error.message || '') && serviceClient) {
     const serviceRestoreResult = await serviceClient
       .from('datasets')
-      .update({ deleted_at: null })
+      .update({ deleted_at: null, status: 'draft' })
       .eq('id', datasetId)
       .eq('user_id', user.id)
       .not('deleted_at', 'is', null)

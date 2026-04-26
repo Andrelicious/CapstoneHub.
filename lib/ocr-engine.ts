@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import { ImageAnnotatorClient, protos } from '@google-cloud/vision'
 import mammoth from 'mammoth'
+import { PDFParse } from 'pdf-parse'
 
 type SupportedFileType = 'image' | 'pdf' | 'docx'
 type OCRProvider = 'google_vision' | 'tesseract' | 'ocr_ai'
@@ -389,6 +390,23 @@ async function extractFromPdf(buffer: Buffer) {
   }
 }
 
+async function extractFromPdfTextLayer(buffer: Buffer) {
+  const parser = new PDFParse({ data: buffer })
+
+  try {
+    const textResult = await parser.getText()
+    const fullText = normalizeText(textResult?.text || '')
+
+    return {
+      fullText,
+      confidence: fullText ? 1 : null,
+      pageCount: typeof textResult?.total === 'number' ? textResult.total : null,
+    }
+  } finally {
+    await parser.destroy().catch(() => undefined)
+  }
+}
+
 async function getTesseractRecognize(): Promise<TesseractRecognizeFn> {
   if (tesseractRecognizeSingleton) {
     return tesseractRecognizeSingleton
@@ -464,6 +482,15 @@ async function runTesseractOCR(params: {
   if (sourceType === 'docx') {
     const docx = await extractFromDocx(params.fileBuffer)
     const fullText = normalizeText(docx.fullText)
+    return {
+      previewText: buildPreview(fullText),
+      fullText,
+    } satisfies OCRExtractionResult
+  }
+
+  if (sourceType === 'pdf') {
+    const pdf = await extractFromPdfTextLayer(params.fileBuffer)
+    const fullText = normalizeText(pdf.fullText)
     return {
       previewText: buildPreview(fullText),
       fullText,
@@ -633,23 +660,6 @@ export async function runOCR(params: {
   }
 
   for (const provider of providerChain) {
-    if (provider === 'tesseract' && sourceType === 'pdf') {
-      if (shouldFallbackPdfToGoogleVision() && isGoogleCredentialsConfigured()) {
-        try {
-          return await runGoogleVisionOCR({ ...params, mimeType })
-        } catch (error: unknown) {
-          const message = error instanceof Error ? error.message : String(error)
-          errors.push(`google_vision(fallback): ${message}`)
-        }
-      }
-
-      errors.push('tesseract: PDF is not supported directly for this provider')
-      if (!allowFailover) {
-        break
-      }
-      continue
-    }
-
     try {
       let result: OCRExtractionResult
 
@@ -662,10 +672,28 @@ export async function runOCR(params: {
       }
 
       const normalizedFullText = normalizeText(result.fullText)
+      const isEmptyPdfResult = sourceType === 'pdf' && normalizedFullText.length === 0
       const isLowQualityPdfResult =
         sourceType === 'pdf' &&
         normalizedFullText.length > 0 &&
         normalizedFullText.length < minPdfFullTextChars
+
+      if (isEmptyPdfResult && shouldFallbackPdfToGoogleVision() && isGoogleCredentialsConfigured()) {
+        try {
+          return await runGoogleVisionOCR({ ...params, mimeType })
+        } catch (error: unknown) {
+          const fallbackMessage = error instanceof Error ? error.message : String(error)
+          errors.push(`google_vision(fallback): ${fallbackMessage}`)
+        }
+      }
+
+      if (isEmptyPdfResult) {
+        errors.push(`${provider}: no extractable text found in PDF`) 
+        if (!allowFailover) {
+          break
+        }
+        continue
+      }
 
       if (isLowQualityPdfResult && allowFailover) {
         errors.push(
