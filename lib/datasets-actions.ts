@@ -1489,7 +1489,36 @@ export async function getOCRResults(datasetId: string) {
     }
   }
 
-  return results || null
+  if (results) {
+    return results
+  }
+
+  // When OCR rows are not available yet, return metadata fallback so the student
+  // Step 4 review can stay informative and consistent with admin fallback behavior.
+  const { data: datasetFallback } = await supabase
+    .from('datasets')
+    .select('title, description')
+    .eq('id', datasetId)
+    .maybeSingle()
+
+  const fallbackTitle = String(datasetFallback?.title || '').trim()
+  const fallbackAbstract = String(datasetFallback?.description || '').trim()
+
+  if (!fallbackTitle && !fallbackAbstract) {
+    return null
+  }
+
+  const fallbackFullText = fallbackTitle && fallbackAbstract
+    ? `${fallbackTitle}\n\n${fallbackAbstract}`
+    : fallbackTitle || fallbackAbstract
+
+  return {
+    title: null,
+    title_hint: fallbackTitle || null,
+    abstract_text: fallbackAbstract || null,
+    full_text: fallbackFullText,
+    source: 'metadata_fallback',
+  }
 }
 
 /**

@@ -176,7 +176,7 @@ export function DatasetSubmissionWizard() {
   }, [draftIdFromQuery, toast])
 
   useEffect(() => {
-    if (step !== 3 || !datasetId) {
+    if ((step !== 3 && step !== 4) || !datasetId) {
       return
     }
 
@@ -197,6 +197,12 @@ export function DatasetSubmissionWizard() {
           const resultsResult = await getOCRResultsSafe(datasetId)
           if (!active) return
           setOcrResults(resultsResult.ok ? resultsResult.data : null)
+        } else if (step === 4) {
+          const resultsResult = await getOCRResultsSafe(datasetId)
+          if (!active) return
+          if (resultsResult.ok && resultsResult.data) {
+            setOcrResults(resultsResult.data)
+          }
         }
       } catch {
         if (active) {
@@ -789,34 +795,38 @@ export function DatasetSubmissionWizard() {
                 </span>
               </div>
               <p className="text-sm text-muted-foreground mb-6">Compare the extracted title and abstract against the uploaded file before submitting to admin review.</p>
-              {ocrResults && (
-                <div className="space-y-4">
-                  <div className="rounded-lg border border-border bg-background/40 p-4 space-y-3">
-                    <div>
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground">Structured OCR</p>
-                      <p className="text-sm text-muted-foreground mt-1">Best-effort title and abstract extracted from the OCR text.</p>
-                    </div>
-
-                    <div className="rounded-md border border-border bg-background/60 p-4">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Title</p>
-                      <p className="text-base font-medium text-foreground leading-6">{displayTitle}</p>
-                    </div>
-
-                    <div className="rounded-md border border-border bg-background/60 p-4">
-                      <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Abstract</p>
-                      <p className="text-sm text-foreground leading-6 whitespace-pre-wrap">
-                        {displayAbstract}
-                      </p>
-                    </div>
-
-                    {usingMetadataFallback ? (
-                      <p className="text-xs text-amber-600 dark:text-amber-300">
-                        Showing submission metadata fallback because structured OCR output is incomplete.
-                      </p>
-                    ) : null}
+              <div className="space-y-4">
+                <div className="rounded-lg border border-border bg-background/40 p-4 space-y-3">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground">Structured OCR</p>
+                    <p className="text-sm text-muted-foreground mt-1">Best-effort title and abstract extracted from the OCR text.</p>
                   </div>
+
+                  <div className="rounded-md border border-border bg-background/60 p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Title</p>
+                    <p className="text-base font-medium text-foreground leading-6">{displayTitle}</p>
+                  </div>
+
+                  <div className="rounded-md border border-border bg-background/60 p-4">
+                    <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Abstract</p>
+                    <p className="text-sm text-foreground leading-6 whitespace-pre-wrap">
+                      {displayAbstract}
+                    </p>
+                  </div>
+
+                  {usingMetadataFallback ? (
+                    <p className="text-xs text-amber-600 dark:text-amber-300">
+                      Showing submission metadata fallback because structured OCR output is incomplete.
+                    </p>
+                  ) : null}
+
+                  {(normalizedOcrStatus === 'queued' || normalizedOcrStatus === 'processing') ? (
+                    <p className="text-xs text-cyan-600 dark:text-cyan-300">
+                      OCR is still running. This review auto-refreshes every few seconds and will update when extraction completes.
+                    </p>
+                  ) : null}
                 </div>
-              )}
+              </div>
             </Card>
           )}
 
