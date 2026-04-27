@@ -94,6 +94,62 @@ function looksLikeNextSectionHeading(line: string) {
   return normalized.length <= 80 && /^[A-Z0-9][A-Z0-9\s&/-]+$/.test(normalized)
 }
 
+function looksLikeMetadataLine(line: string) {
+  const normalized = normalizeWhitespace(line)
+  if (!normalized) return true
+
+  if (/^(acc\.?\s*#|call\s*number|title|author|copyright\s*year)\b/i.test(normalized)) {
+    return true
+  }
+
+  if (/^\d+$/.test(normalized)) return true
+  if (/^[A-Z]{1,4}\s*\d{2,6}$/i.test(normalized)) return true
+  if (/^(table of contents|references|bibliography)$/i.test(normalized)) return true
+
+  return false
+}
+
+function buildAbstractFallback(lines: string[], selectedTitle: string | null) {
+  const titleNormalized = normalizeWhitespace(selectedTitle || '').toLowerCase()
+  const bodyCandidates: string[] = []
+
+  for (const rawLine of lines) {
+    const line = normalizeWhitespace(rawLine)
+    if (!line) continue
+    if (looksLikeMetadataLine(line)) continue
+    if (looksLikeNextSectionHeading(line)) continue
+
+    const lower = line.toLowerCase()
+    if (titleNormalized && lower === titleNormalized) continue
+
+    bodyCandidates.push(line)
+    if (bodyCandidates.length >= 6) break
+  }
+
+  if (!bodyCandidates.length) {
+    return null
+  }
+
+  const chunks: string[] = []
+  let totalChars = 0
+
+  for (const line of bodyCandidates) {
+    chunks.push(line)
+    totalChars += line.length
+
+    if (totalChars >= 140) {
+      break
+    }
+  }
+
+  const merged = normalizeWhitespace(chunks.join(' '))
+  if (merged.length < 40) {
+    return null
+  }
+
+  return merged
+}
+
 export function extractOcrInsights(text: string): OcrInsights {
   const normalizedText = (text || '').replace(/\r\n/g, '\n').replace(/\r/g, '\n')
   const lines = normalizedText.split('\n')
@@ -146,9 +202,10 @@ export function extractOcrInsights(text: string): OcrInsights {
 
   const hasAbstract = sectionLines.length > 0
   const title = pickBestTitle(hasAbstract ? preambleLines : candidateLines)
+  const abstract = hasAbstract ? sectionLines.join(' ') : buildAbstractFallback(candidateLines, title)
 
   return {
     title,
-    abstract: hasAbstract ? sectionLines.join(' ') : null,
+    abstract,
   }
 }
