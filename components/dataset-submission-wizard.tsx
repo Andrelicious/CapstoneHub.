@@ -507,9 +507,24 @@ export function DatasetSubmissionWizard() {
         ? 2
         : 1
   const ocrInsights = extractOcrInsights(ocrResults?.full_text || '')
-  const hasStructuredTitle = Boolean(ocrInsights.title?.trim())
-  const hasStructuredAbstract = Boolean(ocrInsights.abstract?.trim())
+  const structuredTitle =
+    (typeof ocrResults?.title === 'string' && ocrResults.title.trim()) ||
+    (typeof ocrResults?.title_hint === 'string' && ocrResults.title_hint.trim()) ||
+    (ocrInsights.title?.trim() || '')
+  const structuredAbstract =
+    (typeof ocrResults?.abstract_text === 'string' && ocrResults.abstract_text.trim()) ||
+    (ocrInsights.abstract?.trim() || '')
+  const fallbackTitle = formData.title.trim()
+  const fallbackAbstract = formData.description.trim()
   const isTitleOnlySource = looksLikeTitleOnlySource(ocrResults?.full_text || '')
+  const displayTitle = structuredTitle || fallbackTitle || 'Not detected'
+  const displayAbstract =
+    structuredAbstract ||
+    fallbackAbstract ||
+    (isTitleOnlySource ? 'No abstract expected for this title-only source.' : 'Not detected')
+  const usingMetadataFallback = (!structuredTitle && !!fallbackTitle) || (!structuredAbstract && !!fallbackAbstract)
+  const hasStructuredTitle = Boolean(structuredTitle)
+  const hasStructuredAbstract = Boolean(structuredAbstract)
   const extractionQuality =
     normalizedOcrStatus === 'failed'
       ? { label: 'OCR failed', className: 'bg-red-500/15 text-red-600 dark:text-red-300 border-red-500/30' }
@@ -784,15 +799,21 @@ export function DatasetSubmissionWizard() {
 
                     <div className="rounded-md border border-border bg-background/60 p-4">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Title</p>
-                      <p className="text-base font-medium text-foreground leading-6">{ocrInsights.title || 'Not detected'}</p>
+                      <p className="text-base font-medium text-foreground leading-6">{displayTitle}</p>
                     </div>
 
                     <div className="rounded-md border border-border bg-background/60 p-4">
                       <p className="text-xs uppercase tracking-wide text-muted-foreground mb-2">Abstract</p>
                       <p className="text-sm text-foreground leading-6 whitespace-pre-wrap">
-                        {ocrInsights.abstract || (isTitleOnlySource ? 'No abstract expected for this title-only source.' : 'Not detected')}
+                        {displayAbstract}
                       </p>
                     </div>
+
+                    {usingMetadataFallback ? (
+                      <p className="text-xs text-amber-600 dark:text-amber-300">
+                        Showing submission metadata fallback because structured OCR output is incomplete.
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               )}
