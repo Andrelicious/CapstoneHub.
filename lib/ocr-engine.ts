@@ -486,10 +486,57 @@ async function runTesseractOCR(params: {
   if (sourceType === 'pdf') {
     const pdf = await extractFromPdfTextLayer(params.fileBuffer)
     const fullText = normalizeText(pdf.fullText)
-    return {
-      previewText: buildPreview(fullText),
-      fullText,
-    } satisfies OCRExtractionResult
+    const minChars = getMinPdfFullTextChars()
+
+    if (fullText.length >= minChars) {
+      return {
+        previewText: buildPreview(fullText),
+        fullText,
+      } satisfies OCRExtractionResult
+    }
+
+    // For scanned/low-text PDFs, the text layer is often missing or incomplete.
+    // Prefer a PDF-capable OCR provider if it is configured.
+    if (isProviderConfigured('google_vision')) {
+      try {
+        const visionResult = await runGoogleVisionOCR(params)
+        const visionText = normalizeText(visionResult.fullText)
+        if (visionText) {
+          return {
+            previewText: buildPreview(visionText),
+            fullText: visionText,
+          } satisfies OCRExtractionResult
+        }
+      } catch {
+        // Keep trying configured alternatives below.
+      }
+    }
+
+    if (isProviderConfigured('ocr_ai')) {
+      try {
+        const aiResult = await runOCRAiPipeline(params)
+        const aiText = normalizeText(aiResult.fullText)
+        if (aiText) {
+          return {
+            previewText: buildPreview(aiText),
+            fullText: aiText,
+          } satisfies OCRExtractionResult
+        }
+      } catch {
+        // No-op: we'll fall back to text-layer output or final error.
+      }
+    }
+
+    if (fullText) {
+      return {
+        previewText: buildPreview(fullText),
+        fullText,
+      } satisfies OCRExtractionResult
+    }
+
+    throw new Error(
+      'No extractable text found in PDF. This file appears to be scanned/image-only. Configure Google Vision or OCR_AI for PDF OCR, or upload a searchable PDF.'
+    )
   }
 
   const fullText = await runTesseractRecognition(params.fileBuffer)

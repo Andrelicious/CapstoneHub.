@@ -418,9 +418,6 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                   ) : (
                     <div className="bg-white/5 rounded-lg p-4 text-gray-300 text-sm">
                       <p>No OCR full text extracted yet.</p>
-                      {hasFallbackAbstract ? (
-                        <p className="mt-2 text-gray-400">Submission description: {fallbackAbstract}</p>
-                      ) : null}
                       {submission.file_url ? <p className="mt-2 text-gray-400">Use Open Uploaded File in Submission Info for manual review.</p> : null}
                     </div>
                   )}
