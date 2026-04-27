@@ -531,32 +531,6 @@ async function resolveDatasetFilePath(datasetId: string, userId: string) {
   }
 }
 
-async function buildSubmissionMetadataFallbackText(
-  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
-  datasetId: string,
-  userId: string
-) {
-  const read = await supabase
-    .from('datasets')
-    .select('title, description')
-    .eq('id', datasetId)
-    .eq('user_id', userId)
-    .maybeSingle()
-
-  if (read.error || !read.data) {
-    return ''
-  }
-
-  const title = String(read.data.title || '').trim()
-  const description = String(read.data.description || '').trim()
-
-  if (title && description) {
-    return `${title}\n\n${description}`
-  }
-
-  return title || description || ''
-}
-
 async function processDatasetOCR(params: { datasetId: string; userId: string }) {
   await updateOCRJobStatus(params.datasetId, 'processing')
 
@@ -592,37 +566,6 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
   })
 
   if (!ocrResult.fullText.trim()) {
-    const fallbackText = await buildSubmissionMetadataFallbackText(
-      resolved.client,
-      params.datasetId,
-      params.userId
-    )
-
-    if (fallbackText.trim()) {
-      const fallbackResult = {
-        previewText: fallbackText.slice(0, 2200),
-        fullText: fallbackText,
-      }
-
-      await upsertOCRResults(params.datasetId, fallbackResult)
-
-      const fallbackInsights = extractOcrInsights(fallbackResult.fullText || '')
-      await logOCRRunEvent({
-        datasetId: params.datasetId,
-        status: 'done',
-        sourceType,
-        providerHint,
-        durationMs: Date.now() - startedAt,
-        fullTextChars: fallbackResult.fullText.length,
-        hasTitle: Boolean(fallbackInsights.title?.trim()),
-        hasAbstract: Boolean(fallbackInsights.abstract?.trim()),
-        isTitleOnlySource: looksLikeTitleOnlySource(fallbackResult.fullText || ''),
-      })
-
-      await updateOCRJobStatus(params.datasetId, 'done')
-      return
-    }
-
     throw new Error(
       'No readable text was detected from the uploaded file. Please retake the photo in portrait orientation, good lighting, and close framing.'
     )
@@ -1253,39 +1196,6 @@ export async function submitForOCR(datasetId: string) {
   } catch (error: any) {
     const message = normalizeOCRFailureMessage(error?.message || 'Unknown OCR processing error')
 
-    // Production resilience: when OCR provider fails, fall back to submission metadata
-    // so admin review remains readable and the job can complete smoothly.
-    const fallbackText = await buildSubmissionMetadataFallbackText(supabase, datasetId, user.id)
-    if (fallbackText.trim()) {
-      const fallbackResult = {
-        previewText: fallbackText.slice(0, 2200),
-        fullText: fallbackText,
-      }
-
-      await upsertOCRResults(datasetId, fallbackResult)
-
-      const fallbackInsights = extractOcrInsights(fallbackResult.fullText || '')
-      await logOCRRunEvent({
-        datasetId,
-        status: 'done',
-        sourceType: 'metadata_fallback',
-        providerHint: `${process.env.OCR_PROVIDER_CHAIN || process.env.OCR_PROVIDER || 'default'}|metadata_fallback`,
-        fullTextChars: fallbackResult.fullText.length,
-        hasTitle: Boolean(fallbackInsights.title?.trim()),
-        hasAbstract: Boolean(fallbackInsights.abstract?.trim()),
-        isTitleOnlySource: looksLikeTitleOnlySource(fallbackResult.fullText || ''),
-      })
-
-      await updateOCRJobStatus(datasetId, 'done')
-      revalidateTag('datasets')
-      revalidateTag(`dataset-${datasetId}`)
-      return {
-        success: true,
-        status: 'done',
-        message: 'OCR fallback applied using submission metadata.',
-      }
-    }
-
     await updateOCRJobStatus(datasetId, 'failed', message)
     await logOCRRunEvent({
       datasetId,
@@ -1489,36 +1399,7 @@ export async function getOCRResults(datasetId: string) {
     }
   }
 
-  if (results) {
-    return results
-  }
-
-  // When OCR rows are not available yet, return metadata fallback so the student
-  // Step 4 review can stay informative and consistent with admin fallback behavior.
-  const { data: datasetFallback } = await supabase
-    .from('datasets')
-    .select('title, description')
-    .eq('id', datasetId)
-    .maybeSingle()
-
-  const fallbackTitle = String(datasetFallback?.title || '').trim()
-  const fallbackAbstract = String(datasetFallback?.description || '').trim()
-
-  if (!fallbackTitle && !fallbackAbstract) {
-    return null
-  }
-
-  const fallbackFullText = fallbackTitle && fallbackAbstract
-    ? `${fallbackTitle}\n\n${fallbackAbstract}`
-    : fallbackTitle || fallbackAbstract
-
-  return {
-    title: null,
-    title_hint: fallbackTitle || null,
-    abstract_text: fallbackAbstract || null,
-    full_text: fallbackFullText,
-    source: 'metadata_fallback',
-  }
+  return results || null
 }
 
 /**

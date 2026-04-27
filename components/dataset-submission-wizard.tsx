@@ -67,58 +67,6 @@ function looksLikeTitleOnlySource(text: string) {
   )
 }
 
-function normalizeForComparison(value: string) {
-  return (value || '')
-    .toLowerCase()
-    .replace(/[^a-z0-9\s]/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim()
-}
-
-function isLowConfidenceTitle(value: string) {
-  const normalized = (value || '').trim()
-  if (!normalized) return true
-
-  const words = normalized.split(/\s+/).filter(Boolean)
-  const hasLetters = /[a-z]/i.test(normalized)
-  const hasMeaningfulLength = normalized.length >= 12
-  const hasEnoughWords = words.length >= 3
-
-  return !hasLetters || !hasMeaningfulLength || !hasEnoughWords
-}
-
-function isLowConfidenceAbstract(value: string) {
-  const normalized = (value || '').trim()
-  if (!normalized) return true
-
-  const words = normalized.split(/\s+/).filter(Boolean)
-  const hasLetters = /[a-z]/i.test(normalized)
-
-  return !hasLetters || normalized.length < 60 || words.length < 10
-}
-
-function shouldPreferMetadataTitle(ocrTitle: string, metadataTitle: string) {
-  const normalizedOcr = normalizeForComparison(ocrTitle)
-  const normalizedMetadata = normalizeForComparison(metadataTitle)
-
-  if (!normalizedMetadata) return false
-  if (isLowConfidenceTitle(ocrTitle)) return true
-  if (!normalizedOcr) return true
-
-  return normalizedMetadata.includes(normalizedOcr) && normalizedMetadata !== normalizedOcr
-}
-
-function shouldPreferMetadataAbstract(ocrAbstract: string, metadataAbstract: string) {
-  const normalizedOcr = normalizeForComparison(ocrAbstract)
-  const normalizedMetadata = normalizeForComparison(metadataAbstract)
-
-  if (!normalizedMetadata) return false
-  if (isLowConfidenceAbstract(ocrAbstract)) return true
-  if (!normalizedOcr) return true
-
-  return normalizedMetadata.includes(normalizedOcr) && normalizedMetadata !== normalizedOcr
-}
-
 function getReadableErrorMessage(error: unknown) {
   if (!error) return 'Something went wrong. Please try again.'
   if (typeof error === 'string') return error
@@ -572,22 +520,13 @@ export function DatasetSubmissionWizard() {
   const rawStructuredAbstract =
     (typeof ocrResults?.abstract_text === 'string' && ocrResults.abstract_text.trim()) ||
     (ocrInsights.abstract?.trim() || '')
-  const fallbackTitle = formData.title.trim()
-  const fallbackAbstract = formData.description.trim()
-  const preferMetadataTitle = shouldPreferMetadataTitle(rawStructuredTitle, fallbackTitle)
-  const preferMetadataAbstract = shouldPreferMetadataAbstract(rawStructuredAbstract, fallbackAbstract)
-  const structuredTitle = preferMetadataTitle ? '' : rawStructuredTitle
-  const structuredAbstract = preferMetadataAbstract ? '' : rawStructuredAbstract
+  const structuredTitle = rawStructuredTitle
+  const structuredAbstract = rawStructuredAbstract
   const isTitleOnlySource = looksLikeTitleOnlySource(ocrResults?.full_text || '')
-  const displayTitle = structuredTitle || fallbackTitle || 'Not detected'
+  const displayTitle = structuredTitle || 'Not detected'
   const displayAbstract =
     structuredAbstract ||
-    fallbackAbstract ||
     (isTitleOnlySource ? 'No abstract expected for this title-only source.' : 'Not detected')
-  const usingMetadataFallback =
-    ((!structuredTitle && !!fallbackTitle) || (!structuredAbstract && !!fallbackAbstract)) ||
-    preferMetadataTitle ||
-    preferMetadataAbstract
   const hasStructuredTitle = Boolean(structuredTitle)
   const hasStructuredAbstract = Boolean(structuredAbstract)
   const extractionQuality =
@@ -872,12 +811,6 @@ export function DatasetSubmissionWizard() {
                       {displayAbstract}
                     </p>
                   </div>
-
-                  {usingMetadataFallback ? (
-                    <p className="text-xs text-amber-600 dark:text-amber-300">
-                      Showing submission metadata fallback because structured OCR output is incomplete.
-                    </p>
-                  ) : null}
 
                   {(normalizedOcrStatus === 'queued' || normalizedOcrStatus === 'processing') ? (
                     <p className="text-xs text-cyan-600 dark:text-cyan-300">

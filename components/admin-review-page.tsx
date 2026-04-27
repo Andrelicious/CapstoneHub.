@@ -107,18 +107,23 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
     ? extractOcrInsights(submission.full_ocr_text || '')
     : { title: null, abstract: null }
 
+  const pendingLabel =
+    normalizedOcrStatus === 'failed'
+      ? ocrFailureIsConfigurationIssue
+        ? 'Unavailable (OCR not configured)'
+        : 'Unavailable (OCR failed)'
+      : normalizedOcrStatus === 'processing' || normalizedOcrStatus === 'queued'
+        ? 'Waiting for OCR completion'
+        : 'Not available yet'
+
   const title = submission.ocr_title || derivedInsights.title
   const abstractText = submission.ocr_abstract || derivedInsights.abstract
-  const fallbackTitle = submission.title || ''
-  const fallbackAbstract = submission.submission_description || ''
   const hasTitle = Boolean(title?.trim())
   const hasAbstract = Boolean(abstractText?.trim())
-  const hasFallbackTitle = Boolean(fallbackTitle.trim())
-  const hasFallbackAbstract = Boolean(fallbackAbstract.trim())
   const isTitleOnlySource = looksLikeTitleOnlySource(submission.full_ocr_text || '')
 
-  const displayTitle = title || fallbackTitle || pendingLabel
-  const displayAbstract = abstractText || fallbackAbstract || (isTitleOnlySource ? 'No abstract expected for this title-only source.' : pendingLabel)
+  const displayTitle = title || pendingLabel
+  const displayAbstract = abstractText || (isTitleOnlySource ? 'No abstract expected for this title-only source.' : pendingLabel)
 
   const extractionQuality =
     normalizedOcrStatus === 'failed'
@@ -134,15 +139,6 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
           : hasTitle || hasAbstract
             ? { label: 'Partial extraction', className: 'bg-amber-500/15 text-amber-300 border-amber-500/30' }
             : { label: 'No structured output yet', className: 'bg-white/10 text-gray-300 border-white/15' }
-
-  const pendingLabel =
-    normalizedOcrStatus === 'failed'
-      ? ocrFailureIsConfigurationIssue
-        ? 'Unavailable (OCR not configured)'
-        : 'Unavailable (OCR failed)'
-      : normalizedOcrStatus === 'processing' || normalizedOcrStatus === 'queued'
-        ? 'Waiting for OCR completion'
-        : 'Not available yet'
 
   const submittedDate = new Date(submission.submitted_date)
   const hasValidSubmittedDate = !Number.isNaN(submittedDate.getTime())
@@ -376,9 +372,6 @@ export function AdminReviewPage({ submission }: AdminReviewPageProps) {
                       {displayAbstract}
                     </p>
                   </div>
-                  {!hasTitle && (hasFallbackTitle || hasFallbackAbstract) ? (
-                    <p className="text-xs text-amber-300">Showing submission metadata fallback because OCR output is not available yet.</p>
-                  ) : null}
                 </CardContent>
               </Card>
 
