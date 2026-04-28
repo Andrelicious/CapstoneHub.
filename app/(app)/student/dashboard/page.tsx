@@ -212,6 +212,7 @@ export default async function StudentDashboardPage({ searchParams }: StudentDash
                 const config = statusConfig[dataset.normalizedStatus as keyof typeof statusConfig]
                 const IconComponent = config?.icon || FileText
                 const canRemove = dataset.normalizedStatus !== 'approved'
+                const canContinue = dataset.normalizedStatus === 'draft' || dataset.normalizedStatus === 'ocr_processing'
                 return (
                   <div key={dataset.id} className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl bg-accent/40 border border-border hover:bg-accent transition-colors">
                     <div className="flex-1">
@@ -243,10 +244,10 @@ export default async function StudentDashboardPage({ searchParams }: StudentDash
                           </Button>
                         </form>
                       )}
-                      {dataset.normalizedStatus === 'draft' && (
+                      {canContinue && (
                         <Link href={`/submit?draft=${dataset.id}`}>
                           <Button variant="outline" size="sm" className="bg-card border-border text-foreground hover:bg-accent">
-                            Resume Draft
+                            {dataset.normalizedStatus === 'ocr_processing' ? 'Continue Submission' : 'Resume Draft'}
                           </Button>
                         </Link>
                       )}

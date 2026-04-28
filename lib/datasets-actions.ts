@@ -1103,7 +1103,7 @@ export async function updateDatasetDraft(
     })
     .eq('id', datasetId)
     .eq('user_id', user.id)
-    .eq('status', 'draft')
+    .in('status', ['draft', 'ocr_processing'])
     .select()
     .single()
 

@@ -118,6 +118,7 @@ export function DatasetSubmissionWizard() {
   const [step, setStep] = useState<WizardStep>(1)
   const [formData, setFormData] = useState<FormData>(INITIAL_FORM)
   const [file, setFile] = useState<File | null>(null)
+  const [hasExistingUpload, setHasExistingUpload] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [loading, setLoading] = useState(false)
   const [loadingDraft, setLoadingDraft] = useState(!!draftIdFromQuery)
@@ -147,6 +148,7 @@ export function DatasetSubmissionWizard() {
         const draft = draftResult.data
 
         setDatasetId(draft.id)
+        setHasExistingUpload(Boolean(draft.file_path))
         setFormData({
           title: draft.title || '',
           description: draft.description || '',
@@ -156,6 +158,13 @@ export function DatasetSubmissionWizard() {
           category: draft.category || '',
           tags: Array.isArray(draft.tags) ? draft.tags.join(', ') : '',
         })
+        if (draft.status === 'ocr_processing' || draft.status === 'pending_admin_review') {
+          setStep(3)
+        } else if (draft.status === 'approved' || draft.status === 'rejected') {
+          setStep(4)
+        } else {
+          setStep(1)
+        }
       } catch {
         if (!active) return
         toast({
@@ -292,9 +301,10 @@ export function DatasetSubmissionWizard() {
           }
           const dataset = createResult.data
           setDatasetId(dataset.id)
+          setHasExistingUpload(false)
         }
 
-        setStep(2)
+        setStep(hasExistingUpload ? 3 : 2)
       } catch (error: unknown) {
         toast({
           title: 'Error',

@@ -99,10 +99,10 @@ export default async function SubmissionDetailPage({ params }: { params: Promise
                 </Button>
               </Link>
 
-              {dataset.status === 'draft' ? (
+              {dataset.status === 'draft' || dataset.status === 'ocr_processing' ? (
                 <Link href={`/submit?draft=${dataset.id}`}>
                   <Button className="bg-gradient-to-r from-purple-600 to-cyan-500 hover:from-purple-500 hover:to-cyan-400 text-white">
-                    Continue Draft
+                    {dataset.status === 'ocr_processing' ? 'Continue Submission' : 'Continue Draft'}
                   </Button>
                 </Link>
               ) : null}
