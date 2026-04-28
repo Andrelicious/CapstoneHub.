@@ -91,12 +91,17 @@ function createNoopSupabaseClient() {
   } as unknown as SupabaseClient
 }
 
-export function hasSupabaseBrowserConfig() {
+/**
+ * Check if Supabase is configured and ready for auth operations.
+ * This is safe to call multiple times; it checks the runtime config.
+ */
+export function hasSupabaseBrowserConfig(): boolean {
   return isSupabaseConfigured()
 }
 
 /**
  * Get or create a singleton Supabase browser client.
+ * This is the main entry point for all browser Supabase operations.
  */
 function getSupabaseBrowser(options: SupabaseBrowserOptions = {}): SupabaseClient {
   const rememberSession = options.rememberSession !== false
@@ -111,7 +116,11 @@ function getSupabaseBrowser(options: SupabaseBrowserOptions = {}): SupabaseClien
 
   const { url: supabaseUrl, anonKey: supabaseAnonKey } = getSupabaseEnvConfig()
 
+  // Return noop client if config is missing (graceful degradation)
   if (!supabaseUrl || !supabaseAnonKey) {
+    if (typeof window !== 'undefined') {
+      console.warn('[Supabase] Client created without URL or anon key. Auth will not function.')
+    }
     return createNoopSupabaseClient()
   }
 
