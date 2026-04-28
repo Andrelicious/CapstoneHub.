@@ -19,7 +19,12 @@ function isTitleCandidate(line: string) {
   if (!normalized) return false
 
   if (normalized.length < 8 || normalized.length > 160) return false
-  if (/^(abstract|references|bibliography|table of contents)$/i.test(normalized)) return false
+  if (/^(abstract|abstract of the study|references|bibliography|table of contents|acknowledg(e)?ments?|dedication|introduction)$/i.test(normalized)) {
+    return false
+  }
+  if (/^(capstone hub|capstonehub|university of cebu|college of computer studies|a thesis project|presented to the faculty|in partial fulfillment of the requirements|for the degree of|by)$/i.test(normalized)) {
+    return false
+  }
   if (/^(acc\.?\s*#|call\s*number|title|author|copyright\s*year)$/i.test(normalized)) return false
   if (/^acc\.?\s*#\s+call\s*number\s+title\s+author/i.test(normalized)) return false
   if (/^\d+$/.test(normalized)) return false
@@ -73,7 +78,7 @@ function pickBestTitle(preambleLines: string[]) {
 }
 
 function parseSectionHeader(line: string) {
-  const match = line.match(/^(abstract)\s*[:：-]?\s*(.*)$/i)
+  const match = line.match(/^(abstract(?:\s+of\s+the\s+study)?)\s*[:：-]?\s*(.*)$/i)
   if (!match) {
     return null
   }
@@ -87,16 +92,20 @@ function looksLikeNextSectionHeading(line: string) {
   const normalized = normalizeWhitespace(line)
   if (!normalized) return false
 
-  if (/^(acknowledg(e)?ments?|introduction|chapter\s+\d+|references|bibliography|appendix|conclusion|background|methodology|results|discussion|literature review)$/i.test(normalized)) {
+  if (/^(acknowledg(e)?ments?|dedication|introduction|chapter\s+[ivxlcdm\d]+|references|bibliography|appendix|conclusion|background|methodology|results|discussion|literature review|table of contents)$/i.test(normalized)) {
     return true
   }
 
-  return normalized.length <= 80 && /^[A-Z0-9][A-Z0-9\s&/-]+$/.test(normalized)
+  return normalized.length <= 90 && /^[A-Z0-9][A-Z0-9\s&/:;.-]+$/.test(normalized)
 }
 
 function looksLikeMetadataLine(line: string) {
   const normalized = normalizeWhitespace(line)
   if (!normalized) return true
+
+  if (/^(capstone hub|capstonehub|university of cebu|college of computer studies|a thesis project|presented to the faculty|in partial fulfillment of the requirements|for the degree of|by)\b/i.test(normalized)) {
+    return true
+  }
 
   if (/^(acc\.?\s*#|call\s*number|title|author|copyright\s*year)\b/i.test(normalized)) {
     return true

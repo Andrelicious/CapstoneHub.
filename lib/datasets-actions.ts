@@ -248,6 +248,16 @@ function hasMissingColumnError(message: string, column: string) {
   )
 }
 
+function isMissingCanonicalOCRColumnError(message: string) {
+  return (
+    hasMissingColumnError(message, 'ocr_text') ||
+    hasMissingColumnError(message, 'extracted_title') ||
+    hasMissingColumnError(message, 'extracted_abstract') ||
+    hasMissingColumnError(message, 'ocr_completed_at') ||
+    hasMissingColumnError(message, 'ocr_error')
+  )
+}
+
 function isPermissionError(message: string) {
   const normalized = message.toLowerCase()
   return normalized.includes('row-level security policy') || normalized.includes('permission denied')
@@ -349,46 +359,47 @@ async function updateOCRJobStatus(datasetId: string, status: 'queued' | 'process
     serviceRoleKey ? { supabaseKey: serviceRoleKey } : {}
   )
 
-  const payload: Record<string, unknown> = { status }
+  const timestamp = new Date().toISOString()
+  const normalizedErrorMessage = errorMessage ? errorMessage.slice(0, 1000) : null
 
-  if (errorMessage) {
-    payload.error_message = errorMessage.slice(0, 1000)
+  const createCanonicalPayload = () => ({
+    status,
+    ...(normalizedErrorMessage ? { error_message: normalizedErrorMessage, ocr_error: normalizedErrorMessage } : {}),
+    ...(status === 'done' || status === 'failed' ? { ocr_completed_at: timestamp } : {}),
+  })
+
+  const createLegacyPayload = () => ({
+    status,
+    ...(normalizedErrorMessage ? { error_message: normalizedErrorMessage } : {}),
+  })
+
+  const updateWithColumn = async (columnName: 'dataset_id' | 'submission_id', canonical: boolean) => {
+    return await supabase
+      .from('ocr_jobs')
+      .update(canonical ? createCanonicalPayload() : createLegacyPayload())
+      .eq(columnName, datasetId)
   }
 
-  const payloadVariants: Array<Record<string, unknown>> = []
-  payloadVariants.push(payload)
-
-  if ('error_message' in payload) {
-    payloadVariants.push({ status })
-  }
-
-  let updateResult = await supabase.from('ocr_jobs').update(payloadVariants[0]).eq('dataset_id', datasetId)
+  let updateResult = await updateWithColumn('dataset_id', true)
 
   if (updateResult.error) {
     const message = updateResult.error.message || ''
 
-    if (hasMissingColumnError(message, 'error_message')) {
-      const fallbackPayload = payloadVariants[payloadVariants.length - 1]
-      updateResult = await supabase
-        .from('ocr_jobs')
-        .update(fallbackPayload)
-        .eq('dataset_id', datasetId)
-    }
-  }
-
-  if (updateResult.error) {
-    const message = updateResult.error.message || ''
     if (hasMissingColumnError(message, 'dataset_id')) {
-      let fallbackUpdate = await supabase.from('ocr_jobs').update(payloadVariants[0]).eq('submission_id', datasetId)
+      updateResult = await updateWithColumn('submission_id', true)
+    }
 
-      if (fallbackUpdate.error) {
-        const fallbackMessage = fallbackUpdate.error.message || ''
-        if (hasMissingColumnError(fallbackMessage, 'error_message')) {
-          const fallbackPayload = payloadVariants[payloadVariants.length - 1]
-          fallbackUpdate = await supabase
-            .from('ocr_jobs')
-            .update(fallbackPayload)
-            .eq('submission_id', datasetId)
+    if (updateResult.error) {
+      const fallbackMessage = updateResult.error.message || ''
+      if (
+        hasMissingColumnError(fallbackMessage, 'error_message') ||
+        hasMissingColumnError(fallbackMessage, 'ocr_error') ||
+        hasMissingColumnError(fallbackMessage, 'ocr_completed_at')
+      ) {
+        let fallbackUpdate = await updateWithColumn('dataset_id', false)
+
+        if (fallbackUpdate.error && hasMissingColumnError(fallbackUpdate.error.message || '', 'dataset_id')) {
+          fallbackUpdate = await updateWithColumn('submission_id', false)
         }
       }
     }
@@ -404,66 +415,92 @@ async function upsertOCRResults(datasetId: string, result: {
     serviceRoleKey ? { supabaseKey: serviceRoleKey } : {}
   )
 
-  const basePayload = {
-    full_text: result.fullText,
-  }
   const insights = extractOcrInsights(result.fullText || '')
-
-  const insightPayload = {
-    title: insights.title,
-    abstract_text: insights.abstract,
-  }
 
   let upsertError: any = null
 
   const isMissingInsightColumnError = (message: string) => {
     return (
       hasMissingColumnError(message, 'title') ||
+      hasMissingColumnError(message, 'title_hint') ||
       hasMissingColumnError(message, 'abstract_text')
     )
   }
 
-  const createPayload = (useLegacyTitleColumn: boolean, useDatasetColumn: boolean) => {
+  const createCanonicalPayload = (useDatasetColumn: boolean) => {
     return {
       ...(useDatasetColumn ? { dataset_id: datasetId } : { submission_id: datasetId }),
-      ...basePayload,
-      ...(useLegacyTitleColumn ? { title_hint: insightPayload.title } : { title: insightPayload.title }),
-      abstract_text: insightPayload.abstract,
+      preview_text: result.previewText,
+      full_text: result.fullText,
+      ocr_text: result.fullText,
+      title: insights.title,
+      title_hint: insights.title,
+      extracted_title: insights.title,
+      abstract_text: insights.abstract,
+      extracted_abstract: insights.abstract,
     }
   }
 
-  const datasetUpsert = await supabase.from('ocr_results').upsert(
-    createPayload(false, true),
-    { onConflict: 'dataset_id' }
-  )
+  const createLegacyPayload = (useLegacyTitleColumn: boolean, useDatasetColumn: boolean) => {
+    return {
+      ...(useDatasetColumn ? { dataset_id: datasetId } : { submission_id: datasetId }),
+      preview_text: result.previewText,
+      full_text: result.fullText,
+      ...(useLegacyTitleColumn ? { title_hint: insights.title } : { title: insights.title }),
+      abstract_text: insights.abstract,
+    }
+  }
+
+  const datasetUpsert = await supabase.from('ocr_results').upsert(createCanonicalPayload(true), {
+    onConflict: 'dataset_id',
+  })
 
   upsertError = datasetUpsert.error
 
   if (upsertError) {
     const message = upsertError.message || ''
 
-    if (isMissingInsightColumnError(message)) {
-      const insightFallback = await supabase.from('ocr_results').upsert(createPayload(true, true), {
+    if (isMissingCanonicalOCRColumnError(message)) {
+      const canonicalFallback = await supabase.from('ocr_results').upsert(createLegacyPayload(false, true), {
         onConflict: 'dataset_id',
       })
-      upsertError = insightFallback.error
+      upsertError = canonicalFallback.error
+    }
+
+    if (upsertError) {
+      const fallbackMessage = upsertError.message || ''
+      if (isMissingInsightColumnError(fallbackMessage)) {
+        const insightFallback = await supabase.from('ocr_results').upsert(createLegacyPayload(true, true), {
+          onConflict: 'dataset_id',
+        })
+        upsertError = insightFallback.error
+      }
     }
   }
 
   if (upsertError && hasMissingColumnError(upsertError.message || '', 'dataset_id')) {
-    const submissionUpsert = await supabase.from('ocr_results').upsert(
-      createPayload(false, false),
-      { onConflict: 'submission_id' }
-    )
+    const submissionUpsert = await supabase.from('ocr_results').upsert(createCanonicalPayload(false), {
+      onConflict: 'submission_id',
+    })
     upsertError = submissionUpsert.error
 
     if (upsertError) {
       const message = upsertError.message || ''
-      if (isMissingInsightColumnError(message)) {
-        const insightFallback = await supabase.from('ocr_results').upsert(createPayload(true, false), {
+      if (isMissingCanonicalOCRColumnError(message)) {
+        const canonicalFallback = await supabase.from('ocr_results').upsert(createLegacyPayload(false, false), {
           onConflict: 'submission_id',
         })
-        upsertError = insightFallback.error
+        upsertError = canonicalFallback.error
+      }
+
+      if (upsertError) {
+        const fallbackMessage = upsertError.message || ''
+        if (isMissingInsightColumnError(fallbackMessage)) {
+          const insightFallback = await supabase.from('ocr_results').upsert(createLegacyPayload(true, false), {
+            onConflict: 'submission_id',
+          })
+          upsertError = insightFallback.error
+        }
       }
     }
   }
@@ -1343,19 +1380,30 @@ export async function getOCRSchemaHealth() {
 export async function getOCRResults(datasetId: string) {
   const supabase = await createSupabaseServerClient()
 
-  let { data: results, error } = await supabase
-    .from('ocr_results')
-    .select('*')
-    .eq('dataset_id', datasetId)
-    .single()
+  const readOcrResults = async (useDatasetColumn: boolean) => {
+    const columnFilter = useDatasetColumn ? 'dataset_id' : 'submission_id'
+
+    let read = await supabase
+      .from('ocr_results')
+      .select('preview_text, ocr_text, full_text, title, extracted_title, title_hint, abstract_text, extracted_abstract, quality_flags')
+      .eq(columnFilter, datasetId)
+      .maybeSingle()
+
+    if (read.error && isMissingCanonicalColumnError(read.error.message || '')) {
+      read = await supabase
+        .from('ocr_results')
+        .select('preview_text, full_text, title, title_hint, abstract_text, quality_flags')
+        .eq(columnFilter, datasetId)
+        .maybeSingle()
+    }
+
+    return read
+  }
+
+  let { data: results, error } = await readOcrResults(true)
 
   if (error && hasMissingColumnError(error.message || '', 'dataset_id')) {
-    const submissionRead = await supabase
-      .from('ocr_results')
-      .select('*')
-      .eq('submission_id', datasetId)
-      .single()
-
+    const submissionRead = await readOcrResults(false)
     results = submissionRead.data
     error = submissionRead.error
   }
@@ -1399,7 +1447,28 @@ export async function getOCRResults(datasetId: string) {
     }
   }
 
-  return results || null
+  if (!results) {
+    return null
+  }
+
+  const normalizedResults = results as {
+    preview_text?: string | null
+    ocr_text?: string | null
+    full_text?: string | null
+    title?: string | null
+    extracted_title?: string | null
+    title_hint?: string | null
+    abstract_text?: string | null
+    extracted_abstract?: string | null
+    quality_flags?: Record<string, unknown>
+  }
+
+  return {
+    ...normalizedResults,
+    full_text: normalizedResults.ocr_text || normalizedResults.full_text || '',
+    title: normalizedResults.extracted_title || normalizedResults.title || normalizedResults.title_hint || '',
+    abstract_text: normalizedResults.extracted_abstract || normalizedResults.abstract_text || '',
+  }
 }
 
 /**

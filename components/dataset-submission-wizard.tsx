@@ -514,15 +514,17 @@ export function DatasetSubmissionWizard() {
         : 1
   const ocrInsights = extractOcrInsights(ocrResults?.full_text || '')
   const rawStructuredTitle =
+    (typeof ocrResults?.extracted_title === 'string' && ocrResults.extracted_title.trim()) ||
     (typeof ocrResults?.title === 'string' && ocrResults.title.trim()) ||
     (typeof ocrResults?.title_hint === 'string' && ocrResults.title_hint.trim()) ||
     (ocrInsights.title?.trim() || '')
   const rawStructuredAbstract =
+    (typeof ocrResults?.extracted_abstract === 'string' && ocrResults.extracted_abstract.trim()) ||
     (typeof ocrResults?.abstract_text === 'string' && ocrResults.abstract_text.trim()) ||
     (ocrInsights.abstract?.trim() || '')
   const structuredTitle = rawStructuredTitle
   const structuredAbstract = rawStructuredAbstract
-  const isTitleOnlySource = looksLikeTitleOnlySource(ocrResults?.full_text || '')
+  const isTitleOnlySource = looksLikeTitleOnlySource(ocrResults?.ocr_text || ocrResults?.full_text || '')
   const displayTitle = structuredTitle || 'Not detected'
   const displayAbstract =
     structuredAbstract ||

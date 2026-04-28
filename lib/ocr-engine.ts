@@ -1,7 +1,6 @@
 import fs from 'node:fs'
 import { ImageAnnotatorClient, protos } from '@google-cloud/vision'
 import mammoth from 'mammoth'
-import { PDFParse } from 'pdf-parse'
 
 type SupportedFileType = 'image' | 'pdf' | 'docx'
 type OCRProvider = 'google_vision' | 'tesseract' | 'ocr_ai'
@@ -22,6 +21,92 @@ type TesseractRecognizeResult = { data?: { text?: string } }
 type TesseractRecognizeFn = (image: Buffer, lang: string) => Promise<TesseractRecognizeResult>
 
 let tesseractRecognizeSingleton: TesseractRecognizeFn | null = null
+let pdfParseModulePromise: Promise<typeof import('pdf-parse')> | null = null
+
+class PdfMatrixPolyfill {
+  a: number
+  b: number
+  c: number
+  d: number
+  e: number
+  f: number
+
+  constructor(init?: ArrayLike<number> | Record<string, number>) {
+    const values = Array.isArray(init) || ArrayBuffer.isView(init) ? Array.from(init) : null
+    this.a = values?.[0] ?? 1
+    this.b = values?.[1] ?? 0
+    this.c = values?.[2] ?? 0
+    this.d = values?.[3] ?? 1
+    this.e = values?.[4] ?? 0
+    this.f = values?.[5] ?? 0
+  }
+
+  multiplySelf() { return this }
+  preMultiplySelf() { return this }
+  translateSelf() { return this }
+  scaleSelf() { return this }
+  scale3dSelf() { return this }
+  rotateSelf() { return this }
+  rotateAxisAngleSelf() { return this }
+  skewXSelf() { return this }
+  skewYSelf() { return this }
+  invertSelf() { return this }
+  setMatrixValue() { return this }
+  toFloat64Array() { return Float64Array.from([this.a, this.b, this.c, this.d, this.e, this.f]) }
+
+  static fromMatrix(matrix?: Partial<PdfMatrixPolyfill> | null) {
+    return new PdfMatrixPolyfill([
+      matrix?.a ?? 1,
+      matrix?.b ?? 0,
+      matrix?.c ?? 0,
+      matrix?.d ?? 1,
+      matrix?.e ?? 0,
+      matrix?.f ?? 0,
+    ])
+  }
+
+  static fromFloat32Array(values: ArrayLike<number>) {
+    return new PdfMatrixPolyfill(values)
+  }
+
+  static fromFloat64Array(values: ArrayLike<number>) {
+    return new PdfMatrixPolyfill(values)
+  }
+}
+
+function ensurePdfParsingGlobals() {
+  const globalScope = globalThis as typeof globalThis & {
+    DOMMatrix?: typeof PdfMatrixPolyfill
+    DOMMatrixReadOnly?: typeof PdfMatrixPolyfill
+    ImageData?: unknown
+    Path2D?: unknown
+  }
+
+  if (!globalScope.DOMMatrix) {
+    globalScope.DOMMatrix = PdfMatrixPolyfill
+  }
+
+  if (!globalScope.DOMMatrixReadOnly) {
+    globalScope.DOMMatrixReadOnly = PdfMatrixPolyfill
+  }
+
+  if (typeof globalScope.ImageData === 'undefined') {
+    globalScope.ImageData = class ImageDataPolyfill {}
+  }
+
+  if (typeof globalScope.Path2D === 'undefined') {
+    globalScope.Path2D = class Path2DPolyfill {}
+  }
+}
+
+async function loadPdfParseModule() {
+  if (!pdfParseModulePromise) {
+    ensurePdfParsingGlobals()
+    pdfParseModulePromise = import('pdf-parse')
+  }
+
+  return pdfParseModulePromise
+}
 
 function parsePositiveNumberEnv(raw: string | undefined, fallback: number) {
   const parsed = Number(raw)
@@ -386,6 +471,7 @@ async function extractFromPdf(buffer: Buffer) {
 }
 
 async function extractFromPdfTextLayer(buffer: Buffer) {
+  const { PDFParse } = await loadPdfParseModule()
   const parser = new PDFParse({ data: buffer })
 
   try {
@@ -484,7 +570,26 @@ async function runTesseractOCR(params: {
   }
 
   if (sourceType === 'pdf') {
-    const pdf = await extractFromPdfTextLayer(params.fileBuffer)
+    let pdf: { fullText: string; confidence: number | null; pageCount: number | null }
+
+    try {
+      pdf = await extractFromPdfTextLayer(params.fileBuffer)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      if (isProviderConfigured('google_vision')) {
+        const visionResult = await runGoogleVisionOCR(params)
+        const visionText = normalizeText(visionResult.fullText)
+        if (visionText) {
+          return {
+            previewText: buildPreview(visionText),
+            fullText: visionText,
+          } satisfies OCRExtractionResult
+        }
+      }
+
+      throw new Error(`PDF text extraction failed. ${message}`)
+    }
+
     const fullText = normalizeText(pdf.fullText)
     const minChars = getMinPdfFullTextChars()
 
@@ -539,7 +644,35 @@ async function runTesseractOCR(params: {
     )
   }
 
-  const fullText = await runTesseractRecognition(params.fileBuffer)
+  let fullText = ''
+
+  try {
+    fullText = await runTesseractRecognition(params.fileBuffer)
+  } catch (error) {
+    if (isProviderConfigured('google_vision')) {
+      const visionResult = await runGoogleVisionOCR(params)
+      const visionText = normalizeText(visionResult.fullText)
+      if (visionText) {
+        return {
+          previewText: buildPreview(visionText),
+          fullText: visionText,
+        } satisfies OCRExtractionResult
+      }
+    }
+
+    throw error
+  }
+
+  if (!fullText.trim() && isProviderConfigured('google_vision')) {
+    const visionResult = await runGoogleVisionOCR(params)
+    const visionText = normalizeText(visionResult.fullText)
+    if (visionText) {
+      return {
+        previewText: buildPreview(visionText),
+        fullText: visionText,
+      } satisfies OCRExtractionResult
+    }
+  }
 
   return {
     previewText: buildPreview(fullText),

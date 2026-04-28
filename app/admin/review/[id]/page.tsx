@@ -67,14 +67,14 @@ async function getSubmissionData(id: string) {
   const readOcrResults = async (submissionId: string) => {
     let read = await dataSupabase
       .from('ocr_results')
-      .select('title, abstract_text, full_text, quality_flags')
+      .select('ocr_text, extracted_title, extracted_abstract, title, title_hint, abstract_text, full_text, quality_flags')
       .eq('dataset_id', submissionId)
       .maybeSingle()
 
     if (read.error && hasMissingColumnError(read.error.message || '', 'dataset_id')) {
       read = await dataSupabase
         .from('ocr_results')
-        .select('title, abstract_text, full_text, quality_flags')
+        .select('ocr_text, extracted_title, extracted_abstract, title, title_hint, abstract_text, full_text, quality_flags')
         .eq('submission_id', submissionId)
         .maybeSingle()
     }
@@ -82,7 +82,11 @@ async function getSubmissionData(id: string) {
     if (read.error) {
       const missingInsightColumns =
         hasMissingColumnError(read.error.message || '', 'title') ||
-        hasMissingColumnError(read.error.message || '', 'abstract_text')
+        hasMissingColumnError(read.error.message || '', 'title_hint') ||
+        hasMissingColumnError(read.error.message || '', 'abstract_text') ||
+        hasMissingColumnError(read.error.message || '', 'ocr_text') ||
+        hasMissingColumnError(read.error.message || '', 'extracted_title') ||
+        hasMissingColumnError(read.error.message || '', 'extracted_abstract')
 
       if (missingInsightColumns) {
         let fallback = await dataSupabase
@@ -116,6 +120,9 @@ async function getSubmissionData(id: string) {
   const ocrResults = actionOcrResults || ocrResultsRead?.data || null
   const ocrResultsWithFallback = ocrResults as
     | {
+        ocr_text?: string
+        extracted_title?: string
+        extracted_abstract?: string
         title?: string
         title_hint?: string
         abstract_text?: string
@@ -181,9 +188,10 @@ async function getSubmissionData(id: string) {
     status: dataset.status as 'pending_admin_review',
     ocr_status: resolvedOcrStatus,
     ocr_error_message: latestOcrJob?.error_message || '',
-    full_ocr_text: ocrResultsWithFallback?.full_text || '',
-    ocr_title: ocrResultsWithFallback?.title || ocrResultsWithFallback?.title_hint || '',
-    ocr_abstract: ocrResultsWithFallback?.abstract_text || '',
+    full_ocr_text: ocrResultsWithFallback?.ocr_text || ocrResultsWithFallback?.full_text || '',
+    ocr_title:
+      ocrResultsWithFallback?.extracted_title || ocrResultsWithFallback?.title || ocrResultsWithFallback?.title_hint || '',
+    ocr_abstract: ocrResultsWithFallback?.extracted_abstract || ocrResultsWithFallback?.abstract_text || '',
     quality_flags: ocrResultsWithFallback?.quality_flags ? Object.keys(ocrResultsWithFallback.quality_flags) : [],
     ocr_events: ocrEvents,
     file_url: `/api/datasets/${dataset.id}/download`,
