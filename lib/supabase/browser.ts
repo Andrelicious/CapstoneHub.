@@ -11,6 +11,86 @@ type SupabaseBrowserOptions = {
   rememberSession?: boolean
 }
 
+type NoopResult = {
+  data: {
+    session: null
+    user: null
+  } | null
+  error: null | { message: string }
+}
+
+function createNoopSupabaseClient() {
+  const promiseResult = <T extends NoopResult>(result: T) => Promise.resolve(result)
+
+  const queryProxy: any = new Proxy(
+    function () {},
+    {
+      get(_target, property) {
+        if (property === "then") {
+          return (resolve: (value: NoopResult) => void) => resolve({ data: null, error: { message: "Supabase client is disabled because deployment env vars are missing." } })
+        }
+
+        if (property === "catch" || property === "finally") {
+          return undefined
+        }
+
+        return queryProxy
+      },
+      apply() {
+        return queryProxy
+      },
+    }
+  )
+
+  const auth = {
+    async getSession() {
+      return promiseResult({ data: { session: null, user: null }, error: null })
+    },
+    async getUser() {
+      return promiseResult({ data: { session: null, user: null }, error: null })
+    },
+    async signInWithPassword() {
+      return { data: { session: null, user: null }, error: { message: "Supabase is not configured in this deployment." } }
+    },
+    async signUp() {
+      return { data: { session: null, user: null }, error: { message: "Supabase is not configured in this deployment." } }
+    },
+    async signInWithOAuth() {
+      return { data: { provider: null, url: null }, error: { message: "Supabase is not configured in this deployment." } }
+    },
+    async signOut() {
+      return { error: null }
+    },
+    onAuthStateChange() {
+      return {
+        data: {
+          subscription: {
+            unsubscribe() {},
+          },
+        },
+      }
+    },
+    async exchangeCodeForSession() {
+      return { data: { session: null, user: null }, error: { message: "Supabase is not configured in this deployment." } }
+    },
+  }
+
+  return {
+    auth,
+    from() {
+      return queryProxy
+    },
+    rpc() {
+      return queryProxy
+    },
+    storage: {
+      from() {
+        return queryProxy
+      },
+    },
+  } as unknown as SupabaseClient
+}
+
 /**
  * Get or create a singleton Supabase browser client.
  */
@@ -28,9 +108,7 @@ function getSupabaseBrowser(options: SupabaseBrowserOptions = {}): SupabaseClien
   const { url: supabaseUrl, anonKey: supabaseAnonKey } = getSupabaseEnvConfig()
 
   if (!supabaseUrl || !supabaseAnonKey) {
-    throw new Error(
-      "Missing Supabase browser environment variables. Please set NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_URL/SUPABASE_ANON_KEY."
-    )
+    return createNoopSupabaseClient()
   }
 
   const client = createBrowserClient(
