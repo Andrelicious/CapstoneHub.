@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Mail, Lock, User, GraduationCap, ArrowRight, Users, Shield, Loader2 } from "lucide-react"
 import AuthLayout from "@/components/auth-layout"
 import type { UserRole } from "@/types"
-import { supabaseBrowser } from "@/lib/supabase/browser"
+import { hasSupabaseBrowserConfig, supabaseBrowser } from "@/lib/supabase/browser"
 
 const roleOptions: { value: UserRole; label: string; description: string; icon: React.ElementType }[] = [
   {
@@ -38,6 +38,7 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const supabaseReady = hasSupabaseBrowserConfig()
 
   const [formData, setFormData] = useState({
     fullName: "",
@@ -58,6 +59,11 @@ export default function RegisterPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError(null)
+
+    if (!supabaseReady) {
+      setError("Authentication is unavailable in this deployment.")
+      return
+    }
 
     // Validation
     if (formData.password !== formData.confirmPassword) {
@@ -171,7 +177,13 @@ export default function RegisterPage() {
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
-          {error && (
+          {!supabaseReady && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 text-sm">
+              Authentication is unavailable until Supabase env vars are configured in Vercel.
+            </div>
+          )}
+
+          {error && supabaseReady && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">{error}</div>
           )}
 
@@ -185,6 +197,7 @@ export default function RegisterPage() {
                     key={option.value}
                     type="button"
                     onClick={() => setFormData((prev) => ({ ...prev, role: option.value }))}
+                    disabled={!supabaseReady}
                     className={`p-4 rounded-xl border text-left transition-all duration-200 ${
                       formData.role === option.value
                         ? "border-purple-500 bg-purple-500/10"
@@ -223,7 +236,7 @@ export default function RegisterPage() {
                 value={formData.fullName}
                 onChange={handleChange}
                 required
-                disabled={loading}
+                disabled={loading || !supabaseReady}
                 className="pl-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
             </div>
@@ -244,7 +257,7 @@ export default function RegisterPage() {
                   placeholder="2021-12345"
                   value={formData.studentId}
                   onChange={handleChange}
-                  disabled={loading}
+                  disabled={loading || !supabaseReady}
                   className="pl-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
                 />
               </div>
@@ -266,7 +279,7 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                disabled={loading}
+                disabled={loading || !supabaseReady}
                 className="pl-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
             </div>
@@ -287,7 +300,7 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                disabled={loading}
+                disabled={loading || !supabaseReady}
                 className="pl-10 pr-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
               <button
@@ -315,7 +328,7 @@ export default function RegisterPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                disabled={loading}
+                disabled={loading || !supabaseReady}
                 className="pl-10 pr-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
               <button
@@ -330,7 +343,7 @@ export default function RegisterPage() {
 
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || !supabaseReady}
             className="w-full h-12 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-500 hover:to-cyan-400 text-white font-semibold shadow-lg shadow-purple-500/25 group mt-6"
           >
             {loading ? (
@@ -338,6 +351,8 @@ export default function RegisterPage() {
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Creating account...
               </>
+            ) : !supabaseReady ? (
+              <>Authentication Unavailable</>
             ) : (
               <>
                 Create My Workspace

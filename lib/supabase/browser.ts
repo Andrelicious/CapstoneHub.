@@ -2,7 +2,7 @@
 
 import { createBrowserClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
-import { getSupabaseEnvConfig } from "@/lib/supabase/config"
+import { getSupabaseEnvConfig, isSupabaseConfigured } from "@/lib/supabase/config"
 
 let persistentBrowserClientSingleton: SupabaseClient | null = null
 let sessionBrowserClientSingleton: SupabaseClient | null = null
@@ -50,13 +50,13 @@ function createNoopSupabaseClient() {
       return promiseResult({ data: { session: null, user: null }, error: null })
     },
     async signInWithPassword() {
-      return { data: { session: null, user: null }, error: { message: "Supabase is not configured in this deployment." } }
+      return { data: { session: null, user: null }, error: null }
     },
     async signUp() {
-      return { data: { session: null, user: null }, error: { message: "Supabase is not configured in this deployment." } }
+      return { data: { session: null, user: null }, error: null }
     },
     async signInWithOAuth() {
-      return { data: { provider: null, url: null }, error: { message: "Supabase is not configured in this deployment." } }
+      return { data: { provider: null, url: null }, error: null }
     },
     async signOut() {
       return { error: null }
@@ -71,7 +71,7 @@ function createNoopSupabaseClient() {
       }
     },
     async exchangeCodeForSession() {
-      return { data: { session: null, user: null }, error: { message: "Supabase is not configured in this deployment." } }
+      return { data: { session: null, user: null }, error: null }
     },
   }
 
@@ -89,6 +89,10 @@ function createNoopSupabaseClient() {
       },
     },
   } as unknown as SupabaseClient
+}
+
+export function hasSupabaseBrowserConfig() {
+  return isSupabaseConfigured()
 }
 
 /**

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Eye, EyeOff, Mail, Lock, ArrowRight, Loader2 } from "lucide-react"
 import AuthLayout from "@/components/auth-layout"
-import { supabaseBrowser } from "@/lib/supabase/browser"
+import { hasSupabaseBrowserConfig, supabaseBrowser } from "@/lib/supabase/browser"
 
 export default function LoginPage() {
   type LoginErrorState = {
@@ -23,6 +23,7 @@ export default function LoginPage() {
   const [keepSignedIn, setKeepSignedIn] = useState(true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<LoginErrorState | null>(null)
+  const supabaseReady = hasSupabaseBrowserConfig()
 
   const resolveRoleAndRedirect = async () => {
     const response = await fetch('/api/get-profile?ensure=false', { method: 'GET' })
@@ -78,6 +79,8 @@ export default function LoginPage() {
   // Check if already logged in and redirect to dashboard
   useEffect(() => {
     try {
+      if (!supabaseReady) return
+
       if (redirectRecoveryToResetPage()) return
 
       const supabase = supabaseBrowser({ rememberSession: keepSignedIn })
@@ -89,7 +92,7 @@ export default function LoginPage() {
     } catch (err) {
       setError({ message: err instanceof Error ? err.message : "Unable to initialize authentication client." })
     }
-  }, [])
+  }, [supabaseReady])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -97,6 +100,12 @@ export default function LoginPage() {
 
     setError(null)
     setLoading(true)
+
+    if (!supabaseReady) {
+      setError({ message: "Authentication is unavailable in this deployment." })
+      setLoading(false)
+      return
+    }
 
     try {
       const supabase = supabaseBrowser({ rememberSession: keepSignedIn })
@@ -128,6 +137,12 @@ export default function LoginPage() {
   const handleOAuthLogin = async (provider: "google" | "github") => {
     setLoading(true)
     setError(null)
+
+    if (!supabaseReady) {
+      setError({ message: "Authentication is unavailable in this deployment." })
+      setLoading(false)
+      return
+    }
 
     try {
       const supabase = supabaseBrowser()
@@ -162,7 +177,13 @@ export default function LoginPage() {
 
         {/* Form */}
         <form onSubmit={handleLogin} className="space-y-6" autoComplete="on">
-          {error && (
+          {!supabaseReady && (
+            <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/20 text-amber-600 text-sm">
+              Authentication is unavailable until Supabase env vars are configured in Vercel.
+            </div>
+          )}
+
+          {error && supabaseReady && (
             <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
               {error.message}
               {error.compatibilityMessage && <span className="sr-only">{error.compatibilityMessage}</span>}
@@ -183,7 +204,7 @@ export default function LoginPage() {
                 placeholder="student@ccs.edu"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                disabled={loading}
+                disabled={loading || !supabaseReady}
                 className="pl-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
             </div>
@@ -203,7 +224,7 @@ export default function LoginPage() {
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                disabled={loading}
+                disabled={loading || !supabaseReady}
                 className="pl-10 pr-10 bg-background border-border focus:border-purple-500 focus:ring-purple-500/20 text-foreground placeholder:text-muted-foreground h-12"
               />
               <button
@@ -223,7 +244,7 @@ export default function LoginPage() {
                 type="checkbox"
                 checked={keepSignedIn}
                 onChange={(e) => setKeepSignedIn(e.target.checked)}
-                disabled={loading}
+                disabled={loading || !supabaseReady}
                 suppressHydrationWarning
                 className="w-4 h-4 rounded border-border bg-background text-purple-500 focus:ring-purple-500/20"
               />
@@ -236,7 +257,7 @@ export default function LoginPage() {
 
           <Button
             type="submit"
-            disabled={loading}
+            disabled={loading || !supabaseReady}
             className="w-full h-12 bg-gradient-to-r from-purple-600 via-blue-600 to-cyan-500 hover:from-purple-500 hover:via-blue-600 hover:to-cyan-400 text-white font-semibold shadow-lg shadow-purple-500/25 group disabled:opacity-50"
           >
             {loading ? (
@@ -244,6 +265,8 @@ export default function LoginPage() {
                 <Loader2 className="w-5 h-5 mr-2 animate-spin" />
                 Signing in...
               </>
+            ) : !supabaseReady ? (
+              <>Authentication Unavailable</>
             ) : (
               <>
                 Access Workspace
@@ -267,7 +290,7 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="outline"
-            disabled={loading}
+            disabled={loading || !supabaseReady}
             onClick={() => handleOAuthLogin("google")}
             className="h-12 bg-background border-border hover:bg-accent hover:border-border text-foreground"
           >
@@ -294,7 +317,7 @@ export default function LoginPage() {
           <Button
             type="button"
             variant="outline"
-            disabled={loading}
+            disabled={loading || !supabaseReady}
             onClick={() => handleOAuthLogin("github")}
             className="h-12 bg-background border-border hover:bg-accent hover:border-border text-foreground"
           >
