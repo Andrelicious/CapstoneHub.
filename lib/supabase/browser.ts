@@ -2,6 +2,7 @@
 
 import { createBrowserClient } from "@supabase/ssr"
 import type { SupabaseClient } from "@supabase/supabase-js"
+import { getSupabaseEnvConfig } from "@/lib/supabase/config"
 
 let persistentBrowserClientSingleton: SupabaseClient | null = null
 let sessionBrowserClientSingleton: SupabaseClient | null = null
@@ -24,12 +25,11 @@ function getSupabaseBrowser(options: SupabaseBrowserOptions = {}): SupabaseClien
     return sessionBrowserClientSingleton
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const { url: supabaseUrl, anonKey: supabaseAnonKey } = getSupabaseEnvConfig()
 
   if (!supabaseUrl || !supabaseAnonKey) {
     throw new Error(
-      "Missing Supabase browser environment variables. Please set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY."
+      "Missing Supabase browser environment variables. Please set NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_URL/SUPABASE_ANON_KEY."
     )
   }
 

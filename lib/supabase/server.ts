@@ -4,6 +4,7 @@
 
 import { createServerClient } from "@supabase/ssr"
 import { cookies } from "next/headers"
+import { getSupabaseEnvConfig } from "@/lib/supabase/config"
 
 type CreateSupabaseServerClientOptions = {
   supabaseKey?: string
@@ -11,10 +12,16 @@ type CreateSupabaseServerClientOptions = {
 
 export async function createSupabaseServerClient(options: CreateSupabaseServerClientOptions = {}) {
   const cookieStore = await cookies()
+  const { url: supabaseUrl, anonKey: resolvedAnonKey } = getSupabaseEnvConfig()
+  const supabaseAnonKey = options.supabaseKey ?? resolvedAnonKey
+
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('Missing Supabase server environment variables. Set NEXT_PUBLIC_SUPABASE_URL/NEXT_PUBLIC_SUPABASE_ANON_KEY or SUPABASE_URL/SUPABASE_ANON_KEY.')
+  }
 
   return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    options.supabaseKey ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl,
+    supabaseAnonKey,
     {
       cookies: {
         getAll() {
