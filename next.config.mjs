@@ -20,6 +20,17 @@ const nextConfig = {
   turbopack: {
     root: __dirname,
   },
+  // Configure webpack to handle tesseract.js worker files in serverless
+  webpack: (config, { isServer }) => {
+    if (isServer) {
+      // Mark tesseract.js as external to prevent bundling issues with workers
+      if (!config.externals) config.externals = []
+      if (typeof config.externals !== 'function') {
+        config.externals.push('tesseract.js')
+      }
+    }
+    return config
+  },
 }
 
 export default nextConfig
