@@ -132,7 +132,8 @@ function buildAbstractFallback(lines: string[], selectedTitle: string | null) {
     if (titleNormalized && lower === titleNormalized) continue
 
     bodyCandidates.push(line)
-    if (bodyCandidates.length >= 6) break
+    // Collect more lines for better abstract formation
+    if (bodyCandidates.length >= 12) break
   }
 
   if (!bodyCandidates.length) {
@@ -146,13 +147,15 @@ function buildAbstractFallback(lines: string[], selectedTitle: string | null) {
     chunks.push(line)
     totalChars += line.length
 
-    if (totalChars >= 140) {
+    // Increased character threshold for better abstract
+    if (totalChars >= 250) {
       break
     }
   }
 
   const merged = normalizeWhitespace(chunks.join(' '))
-  if (merged.length < 40) {
+  // Require minimum length for meaningful abstract
+  if (merged.length < 80) {
     return null
   }
 
@@ -176,7 +179,7 @@ export function extractOcrInsights(text: string): OcrInsights {
       continue
     }
 
-    if (candidateLines.length < 40) {
+    if (candidateLines.length < 50) {
       candidateLines.push(line)
     }
 
@@ -204,14 +207,23 @@ export function extractOcrInsights(text: string): OcrInsights {
       continue
     }
 
-    if (preambleLines.length < 8) {
+    if (preambleLines.length < 10) {
       preambleLines.push(line)
     }
   }
 
   const hasAbstract = sectionLines.length > 0
   const title = pickBestTitle(hasAbstract ? preambleLines : candidateLines)
-  const abstract = hasAbstract ? sectionLines.join(' ') : buildAbstractFallback(candidateLines, title)
+  
+  let abstract: string | null
+  if (hasAbstract) {
+    // If we found an explicit abstract section, use it
+    const abstractText = sectionLines.join(' ')
+    abstract = normalizeWhitespace(abstractText).length > 80 ? normalizeWhitespace(abstractText) : null
+  } else {
+    // Try fallback extraction
+    abstract = buildAbstractFallback(candidateLines, title)
+  }
 
   return {
     title,

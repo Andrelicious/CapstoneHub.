@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { deleteOwnDataset } from '@/lib/datasets-actions'
-import { getCurrentProfileServer } from '@/lib/profile-server'
 import { Upload, BookOpen, Clock, CheckCircle2, XCircle, Eye, FileText, Calendar, ArrowRight, GraduationCap, Trash2, ArchiveRestore } from 'lucide-react'
 
 type WorkflowStatus = 'draft' | 'ocr_processing' | 'pending_admin_review' | 'approved' | 'rejected'
@@ -35,13 +35,9 @@ const statusConfig = {
   rejected: { icon: XCircle, color: 'text-red-400', bgColor: 'bg-red-500/20 border-red-500/30', label: 'Rejected' },
 }
 
-type StudentDashboardPageProps = {
-  searchParams?: Promise<Record<string, string | string[] | undefined>>
-}
-
-export default async function StudentDashboardPage({ searchParams }: StudentDashboardPageProps) {
+export default async function StudentDashboardPage() {
+  const cookieStore = await cookies()
   const supabase = await createSupabaseServerClient()
-  const resolvedSearchParams = (await searchParams) || {}
 
   // Check authentication & role
   const { data: { user } } = await supabase.auth.getUser()
@@ -50,8 +46,13 @@ export default async function StudentDashboardPage({ searchParams }: StudentDash
   // Fetch profile using service role API to avoid RLS infinite recursion
   let profile = null
   try {
-    const resolved = await getCurrentProfileServer()
-    profile = resolved.profile
+    const profileRes = await fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/api/get-profile`, {
+      headers: { cookie: cookieStore.getAll().map(({ name, value }) => `${name}=${value}`).join('; ') },
+    })
+    if (profileRes.ok) {
+      const { profile: p } = await profileRes.json()
+      profile = p
+    }
   } catch (e) {
     console.error('Failed to fetch profile:', e)
   }
@@ -65,7 +66,6 @@ export default async function StudentDashboardPage({ searchParams }: StudentDash
   }
 
   const displayName = profile?.display_name || user.email?.split('@')[0] || 'Student'
-  const restored = resolvedSearchParams.restored === '1'
 
   // Fetch student's own submissions
   let submissions: any[] | null = null
@@ -128,11 +128,6 @@ export default async function StudentDashboardPage({ searchParams }: StudentDash
               </Button>
             </Link>
           </div>
-          {restored && (
-            <div className="mt-4 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
-              Submission restored to your Draft area successfully.
-            </div>
-          )}
         </div>
 
         {/* Quick Actions */}
@@ -212,7 +207,6 @@ export default async function StudentDashboardPage({ searchParams }: StudentDash
                 const config = statusConfig[dataset.normalizedStatus as keyof typeof statusConfig]
                 const IconComponent = config?.icon || FileText
                 const canRemove = dataset.normalizedStatus !== 'approved'
-                const canContinue = dataset.normalizedStatus === 'draft' || dataset.normalizedStatus === 'ocr_processing'
                 return (
                   <div key={dataset.id} className="flex flex-col md:flex-row md:items-center gap-4 p-4 rounded-xl bg-accent/40 border border-border hover:bg-accent transition-colors">
                     <div className="flex-1">
@@ -244,10 +238,10 @@ export default async function StudentDashboardPage({ searchParams }: StudentDash
                           </Button>
                         </form>
                       )}
-                      {canContinue && (
+                      {dataset.status === 'draft' && (
                         <Link href={`/submit?draft=${dataset.id}`}>
                           <Button variant="outline" size="sm" className="bg-card border-border text-foreground hover:bg-accent">
-                            {dataset.normalizedStatus === 'ocr_processing' ? 'Continue Submission' : 'Resume Draft'}
+                            Resume Draft
                           </Button>
                         </Link>
                       )}

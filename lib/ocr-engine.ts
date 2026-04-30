@@ -317,7 +317,16 @@ function detectSourceType(fileName: string, mimeType: string | null): SupportedF
 }
 
 function normalizeText(raw: string) {
-  return raw.replace(/\u0000/g, '').replace(/\r/g, '').trim()
+  if (!raw) return ''
+  
+  let normalized = raw
+    .replace(/\u0000/g, '') // Remove null bytes
+    .replace(/[\r\f\v]/g, '') // Remove carriage returns, form feeds, vertical tabs
+    .replace(/\n\s*\n/g, '\n\n') // Normalize multiple newlines
+    .replace(/  +/g, ' ') // Collapse multiple spaces
+    .trim()
+  
+  return normalized
 }
 
 function buildPreview(fullText: string) {
@@ -620,16 +629,25 @@ async function runTesseractOCR(params: {
 
     try {
       pdf = await extractFromPdfTextLayer(params.fileBuffer)
+      console.log(`[OCR] PDF text layer extraction: ${pdf.fullText.length} chars extracted`)
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[OCR] PDF text layer extraction failed: ${message}`)
+      
       if (isProviderConfigured('google_vision')) {
-        const visionResult = await runGoogleVisionOCR(params)
-        const visionText = normalizeText(visionResult.fullText)
-        if (visionText) {
-          return {
-            previewText: buildPreview(visionText),
-            fullText: visionText,
-          } satisfies OCRExtractionResult
+        try {
+          console.log(`[OCR] Attempting Google Vision for PDF...`)
+          const visionResult = await runGoogleVisionOCR(params)
+          const visionText = normalizeText(visionResult.fullText)
+          if (visionText) {
+            console.log(`[OCR] Google Vision extracted ${visionText.length} chars from PDF`)
+            return {
+              previewText: buildPreview(visionText),
+              fullText: visionText,
+            } satisfies OCRExtractionResult
+          }
+        } catch (visionError) {
+          console.warn(`[OCR] Google Vision fallback failed:`, visionError instanceof Error ? visionError.message : String(visionError))
         }
       }
 
@@ -640,11 +658,14 @@ async function runTesseractOCR(params: {
     const minChars = getMinPdfFullTextChars()
 
     if (fullText.length >= minChars) {
+      console.log(`[OCR] PDF text layer extraction successful: ${fullText.length} chars`)
       return {
         previewText: buildPreview(fullText),
         fullText,
       } satisfies OCRExtractionResult
     }
+
+    console.log(`[OCR] PDF text layer insufficient (${fullText.length}/${minChars} chars). Attempting OCR...`)
 
     // For scanned/low-text PDFs, the text layer is often missing or incomplete.
     // Prefer a PDF-capable OCR provider if it is configured.

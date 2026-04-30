@@ -3,6 +3,7 @@
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { revalidateTag as nextRevalidateTag, revalidatePath as nextRevalidatePath } from 'next/cache'
 import { extractOcrInsights } from '@/lib/ocr-insights'
+import { reportOCRDiagnostics, validateOCRContent } from '@/lib/ocr-diagnostics'
 
 const revalidateTag = (tag: string) => nextRevalidateTag(tag, 'max')
 const revalidatePath = (path: string) => nextRevalidatePath(path)
@@ -415,7 +416,37 @@ async function upsertOCRResults(datasetId: string, result: {
     serviceRoleKey ? { supabaseKey: serviceRoleKey } : {}
   )
 
-  const insights = extractOcrInsights(result.fullText || '')
+  // Validate that we have actual content to store
+  const fullTextContent = (result.fullText || '').trim()
+  const previewContent = (result.previewText || '').trim()
+
+  // Validate content before storing
+  const validation = validateOCRContent(fullTextContent, 50)
+  if (!validation.valid) {
+    console.warn(`[upsertOCRResults] Content validation failed for ${datasetId}:`, validation.reasons)
+    reportOCRDiagnostics(datasetId, fullTextContent, 'upsertOCRResults-validation')
+  }
+
+  if (!fullTextContent) {
+    console.error('[upsertOCRResults] WARNING: fullText is empty for datasetId:', datasetId)
+  }
+
+  const insights = extractOcrInsights(fullTextContent)
+
+  // Log extraction results for debugging
+  console.log(`[upsertOCRResults] Dataset ${datasetId}:`, {
+    fullTextLength: fullTextContent.length,
+    previewLength: previewContent.length,
+    hasTitle: Boolean(insights.title?.trim()),
+    hasAbstract: Boolean(insights.abstract?.trim()),
+    titleLength: insights.title?.length || 0,
+    abstractLength: insights.abstract?.length || 0,
+  })
+
+  // Report diagnostics
+  if (fullTextContent.length > 0) {
+    reportOCRDiagnostics(datasetId, fullTextContent, 'upsertOCRResults')
+  }
 
   let upsertError: any = null
 
@@ -430,24 +461,24 @@ async function upsertOCRResults(datasetId: string, result: {
   const createCanonicalPayload = (useDatasetColumn: boolean) => {
     return {
       ...(useDatasetColumn ? { dataset_id: datasetId } : { submission_id: datasetId }),
-      preview_text: result.previewText,
-      full_text: result.fullText,
-      ocr_text: result.fullText,
-      title: insights.title,
-      title_hint: insights.title,
-      extracted_title: insights.title,
-      abstract_text: insights.abstract,
-      extracted_abstract: insights.abstract,
+      preview_text: previewContent || null,
+      full_text: fullTextContent || null,
+      ocr_text: fullTextContent || null,
+      title: insights.title || null,
+      title_hint: insights.title || null,
+      extracted_title: insights.title || null,
+      abstract_text: insights.abstract || null,
+      extracted_abstract: insights.abstract || null,
     }
   }
 
   const createLegacyPayload = (useLegacyTitleColumn: boolean, useDatasetColumn: boolean) => {
     return {
       ...(useDatasetColumn ? { dataset_id: datasetId } : { submission_id: datasetId }),
-      preview_text: result.previewText,
-      full_text: result.fullText,
-      ...(useLegacyTitleColumn ? { title_hint: insights.title } : { title: insights.title }),
-      abstract_text: insights.abstract,
+      preview_text: previewContent || null,
+      full_text: fullTextContent || null,
+      ...(useLegacyTitleColumn ? { title_hint: insights.title || null } : { title: insights.title || null }),
+      abstract_text: insights.abstract || null,
     }
   }
 
@@ -574,6 +605,15 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
   const resolved = await resolveDatasetFilePath(params.datasetId, params.userId)
   const providerHint = process.env.OCR_PROVIDER_CHAIN || process.env.OCR_PROVIDER || 'default'
   const sourceType = detectOCRSourceType(resolved.fileName || resolved.filePath, resolved.mimeType)
+  
+  console.log(`[processDatasetOCR] Starting OCR for dataset ${params.datasetId}:`, {
+    filePath: resolved.filePath,
+    fileName: resolved.fileName,
+    sourceType,
+    mimeType: resolved.mimeType,
+    provider: providerHint,
+  })
+
   await logOCRRunEvent({
     datasetId: params.datasetId,
     status: 'processing',
@@ -585,10 +625,13 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
   const download = await resolved.client.storage.from('datasets').download(resolved.filePath)
 
   if (download.error || !download.data) {
-    throw new Error(`Failed to download file for OCR: ${download.error?.message || 'Unknown download error'}`)
+    const errorMsg = `Failed to download file for OCR: ${download.error?.message || 'Unknown download error'}`
+    console.error(`[processDatasetOCR] ${errorMsg}`)
+    throw new Error(errorMsg)
   }
 
   const fileBuffer = Buffer.from(await download.data.arrayBuffer())
+  console.log(`[processDatasetOCR] Downloaded file: ${fileBuffer.length} bytes`)
 
   // Load OCR engine only when OCR is actually executed so draft/admin flows stay resilient.
   const { runOCR } = await import('@/lib/ocr-engine').catch((error: unknown) => {
@@ -602,15 +645,27 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
     mimeType: resolved.mimeType,
   })
 
+  console.log(`[processDatasetOCR] OCR extraction completed:`, {
+    fullTextLength: ocrResult.fullText.length,
+    previewTextLength: ocrResult.previewText.length,
+  })
+
   if (!ocrResult.fullText.trim()) {
-    throw new Error(
-      'No readable text was detected from the uploaded file. Please retake the photo in portrait orientation, good lighting, and close framing.'
-    )
+    const errorMsg = 'No readable text was detected from the uploaded file. Please retake the photo in portrait orientation, good lighting, and close framing.'
+    console.error(`[processDatasetOCR] ${errorMsg}`)
+    throw new Error(errorMsg)
   }
 
   await upsertOCRResults(params.datasetId, ocrResult)
 
   const insights = extractOcrInsights(ocrResult.fullText || '')
+  console.log(`[processDatasetOCR] OCR insights extracted:`, {
+    hasTitle: Boolean(insights.title?.trim()),
+    titleLength: insights.title?.length || 0,
+    hasAbstract: Boolean(insights.abstract?.trim()),
+    abstractLength: insights.abstract?.length || 0,
+  })
+
   await logOCRRunEvent({
     datasetId: params.datasetId,
     status: 'done',

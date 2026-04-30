@@ -5,7 +5,6 @@ import { usePathname } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Menu, X, Upload } from "lucide-react"
 import { supabaseBrowser } from "@/lib/supabase/browser"
-import { getCachedClientProfile, clearCachedClientProfile } from "@/lib/profile-client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 import ProfilePanel from "@/components/profile-panel"
 import { NotificationDropdown } from "@/components/notification-dropdown"
@@ -39,8 +38,9 @@ export default function Navbar() {
 
     const fetchProfile = async (sessionUser: SupabaseUser) => {
       try {
-        const apiProfile = await getCachedClientProfile()
-        if (apiProfile) {
+        const response = await fetch("/api/get-profile")
+        if (response.ok) {
+          const { profile: apiProfile } = await response.json()
           setProfile({
             display_name: apiProfile?.display_name || sessionUser.email?.split("@")[0] || "User",
             email: apiProfile?.email || sessionUser.email || null,
@@ -73,7 +73,6 @@ export default function Navbar() {
         setUser(session.user)
         void fetchProfile(session.user)
       } else {
-        clearCachedClientProfile()
         setUser(null)
         setProfile(null)
       }
