@@ -16,9 +16,6 @@ import { supabaseBrowser } from '@/lib/supabase/browser'
 import {
   createDatasetDraftSafe,
   getOwnDatasetDraftSafe,
-  submitForOCRSafe,
-  getOCRStatusSafe,
-  getOCRResultsSafe,
   submitForAdminReviewSafe,
   updateDatasetDraftSafe,
 } from '@/lib/datasets-actions'
@@ -100,6 +97,67 @@ function getReadableErrorMessage(error: unknown) {
   }
 
   return 'Something went wrong. Please try again.'
+}
+
+function isStaleServerActionError(error: unknown) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : typeof (error as { message?: unknown })?.message === 'string'
+        ? ((error as { message?: string }).message as string)
+        : typeof error === 'string'
+          ? error
+          : ''
+
+  const normalized = message.toLowerCase()
+  return (
+    normalized.includes('failed-to-find-server-action') ||
+    normalized.includes('was not found on the server')
+  )
+}
+
+async function startOCRViaApi(datasetId: string) {
+  const response = await fetch(`/api/datasets/${datasetId}/ocr`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+  })
+  const payload = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Unable to start OCR processing.')
+  }
+
+  return payload?.data
+}
+
+async function getOCRStatusViaApi(datasetId: string) {
+  const response = await fetch(`/api/datasets/${datasetId}/ocr/status`, {
+    method: 'GET',
+    cache: 'no-store',
+  })
+  const payload = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Unable to get OCR status.')
+  }
+
+  return payload?.data
+}
+
+async function getOCRResultsViaApi(datasetId: string) {
+  const response = await fetch(`/api/datasets/${datasetId}/ocr/results`, {
+    method: 'GET',
+    cache: 'no-store',
+  })
+  const payload = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    throw new Error(payload?.error || 'Unable to get OCR results.')
+  }
+
+  return payload?.data
 }
 
 const INITIAL_FORM: FormData = {
@@ -194,23 +252,21 @@ export function DatasetSubmissionWizard() {
 
     const refreshOCRState = async () => {
       try {
-        const statusResult = await getOCRStatusSafe(datasetId)
+        const job = await getOCRStatusViaApi(datasetId)
         if (!active) return
-
-        const job = statusResult.ok ? statusResult.data : null
 
         const status = job?.status || 'processing'
         setOcrStatus(status)
 
         if (status === 'done') {
-          const resultsResult = await getOCRResultsSafe(datasetId)
+          const results = await getOCRResultsViaApi(datasetId)
           if (!active) return
-          setOcrResults(resultsResult.ok ? resultsResult.data : null)
+          setOcrResults(results)
         } else if (step === 4) {
-          const resultsResult = await getOCRResultsSafe(datasetId)
+          const results = await getOCRResultsViaApi(datasetId)
           if (!active) return
-          if (resultsResult.ok && resultsResult.data) {
-            setOcrResults(resultsResult.data)
+          if (results) {
+            setOcrResults(results)
           }
         }
       } catch {
@@ -381,14 +437,15 @@ export function DatasetSubmissionWizard() {
           throw new Error(`File upload failed: ${uploadError.message}`)
         }
 
-        const ocrSubmissionResult = await submitForOCRSafe(datasetId)
-        if (!ocrSubmissionResult.ok) {
-          throw new Error(ocrSubmissionResult.error)
-        }
-        const ocrSubmission = ocrSubmissionResult.data
+        const ocrSubmission = await startOCRViaApi(datasetId)
         setOcrStatus(ocrSubmission?.status || 'queued')
         setStep(3)
       } catch (error: unknown) {
+        if (isStaleServerActionError(error) && datasetId) {
+          window.location.assign(`/submit?draft=${datasetId}`)
+          return
+        }
+
         toast({
           title: 'Error',
           description: getReadableErrorMessage(error),
@@ -414,24 +471,20 @@ export function DatasetSubmissionWizard() {
         // Poll OCR status with bounded retries
         const maxPolls = 20
         let polls = 0
-        const firstStatus = await getOCRStatusSafe(datasetId)
-        let job = firstStatus.ok ? firstStatus.data : null
+        let job = await getOCRStatusViaApi(datasetId)
         while (polls < maxPolls && job?.status !== 'done' && job?.status !== 'failed') {
           await new Promise((resolve) => setTimeout(resolve, 1000))
-          const nextStatus = await getOCRStatusSafe(datasetId)
-          job = nextStatus.ok ? nextStatus.data : null
+          job = await getOCRStatusViaApi(datasetId)
           setOcrStatus(job?.status || 'processing')
           polls += 1
         }
 
         if (job?.status === 'done') {
-          const resultsResult = await getOCRResultsSafe(datasetId)
-          const results = resultsResult.ok ? resultsResult.data : null
+          const results = await getOCRResultsViaApi(datasetId)
           setOcrResults(results)
           setStep(4)
         } else if (job?.status === 'failed') {
-          const failedResults = await getOCRResultsSafe(datasetId)
-          const results = failedResults.ok ? failedResults.data : null
+          const results = await getOCRResultsViaApi(datasetId)
           setOcrResults(results)
           toast({
             title: 'OCR failed',
@@ -439,8 +492,7 @@ export function DatasetSubmissionWizard() {
           })
           setStep(4)
         } else {
-          const resultsResult = await getOCRResultsSafe(datasetId)
-          const results = resultsResult.ok ? resultsResult.data : null
+          const results = await getOCRResultsViaApi(datasetId)
           setOcrResults(results)
           toast({
             title: 'OCR still processing',
