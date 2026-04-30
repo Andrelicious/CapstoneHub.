@@ -924,6 +924,82 @@ async function runOCRAiPipeline(params: {
     } satisfies OCRExtractionResult
   }
 
+  if (sourceType === 'pdf') {
+    let pdfTextLayer: { fullText: string; confidence: number | null; pageCount: number | null } | null = null
+
+    try {
+      pdfTextLayer = await extractFromPdfTextLayer(params.fileBuffer)
+      console.log(`[OCR] OCR AI PDF text layer extraction: ${pdfTextLayer.fullText.length} chars extracted`)
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[OCR] OCR AI PDF text layer extraction failed: ${message}`)
+    }
+
+    const normalizedTextLayer = normalizeText(pdfTextLayer?.fullText || '')
+    const minChars = getMinPdfFullTextChars()
+
+    if (normalizedTextLayer.length >= minChars) {
+      return {
+        previewText: buildPreview(normalizedTextLayer),
+        fullText: normalizedTextLayer,
+      } satisfies OCRExtractionResult
+    }
+
+    try {
+      const fullText = await runOCRAiRecognition({
+        fileBuffer: params.fileBuffer,
+        fileName: params.filePath,
+        mimeType,
+      })
+
+      if (fullText.trim()) {
+        return {
+          previewText: buildPreview(fullText),
+          fullText,
+        } satisfies OCRExtractionResult
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[OCR] OCR AI direct PDF extraction failed: ${message}`)
+    }
+
+    try {
+      const rasterizedFullText = await extractTextFromRasterizedPdfPages(
+        params.fileBuffer,
+        async (pageBuffer, pageNumber) => {
+          const pageResult = await runOCRAiRecognition({
+            fileBuffer: pageBuffer,
+            fileName: `${params.filePath.replace(/\.pdf$/i, '')}-page-${pageNumber}.png`,
+            mimeType: 'image/png',
+          })
+
+          return pageResult
+        }
+      )
+
+      if (rasterizedFullText.trim()) {
+        return {
+          previewText: buildPreview(rasterizedFullText),
+          fullText: rasterizedFullText,
+        } satisfies OCRExtractionResult
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[OCR] OCR AI rasterized PDF extraction failed: ${message}`)
+    }
+
+    if (normalizedTextLayer) {
+      return {
+        previewText: buildPreview(normalizedTextLayer),
+        fullText: normalizedTextLayer,
+      } satisfies OCRExtractionResult
+    }
+
+    throw new Error(
+      'OCR AI could not extract readable text from this PDF. Try a searchable PDF, or enable a different OCR provider as fallback.'
+    )
+  }
+
   const fullText = await runOCRAiRecognition({
     fileBuffer: params.fileBuffer,
     fileName: params.filePath,
