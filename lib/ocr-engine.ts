@@ -485,7 +485,23 @@ async function extractFromPdfTextLayer(buffer: Buffer) {
 
   try {
     const textResult = await parser.getText()
-    const fullText = normalizeText(textResult?.text || '')
+    let fullText = normalizeText(textResult?.text || '')
+
+    // Some PDFs yield empty text with the class-based parser but still work
+    // with the classic pdf-parse function export. Try that before giving up.
+    if (!fullText) {
+      try {
+        const legacyModule = await loadPdfParseModule()
+        const legacyParse = (legacyModule as any)?.default || (legacyModule as any)
+
+        if (typeof legacyParse === 'function') {
+          const legacyResult = await legacyParse(buffer)
+          fullText = normalizeText(legacyResult?.text || '')
+        }
+      } catch {
+        // Keep primary parser result if legacy parser path fails.
+      }
+    }
 
     return {
       fullText,
@@ -541,6 +557,29 @@ async function convertPdfToImagesWithSharp(buffer: Buffer, density = 200) {
   }
 
   return images
+}
+
+async function extractTextFromRasterizedPdfPages(
+  buffer: Buffer,
+  extractor: (pageBuffer: Buffer, pageNumber: number) => Promise<string>,
+  density = 200
+) {
+  const images = await convertPdfToImagesWithSharp(buffer, density)
+  const pageTexts: string[] = []
+
+  for (let index = 0; index < images.length; index += 1) {
+    try {
+      const pageText = await extractor(images[index], index + 1)
+      if (pageText) {
+        pageTexts.push(pageText)
+      }
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      console.warn(`[OCR] Rasterized PDF page ${index + 1} extraction failed: ${message}`)
+    }
+  }
+
+  return normalizeText(pageTexts.join('\n\n'))
 }
 
 async function getTesseractRecognize(): Promise<TesseractRecognizeFn> {
@@ -688,19 +727,10 @@ async function runTesseractOCR(params: {
     // rasterize PDF pages to images and run Tesseract per page. This allows
     // purely scanned PDFs to be processed without Google Vision / OCR AI.
     try {
-      const images = await convertPdfToImagesWithSharp(params.fileBuffer)
-      const pageTexts: string[] = []
+      const joined = await extractTextFromRasterizedPdfPages(params.fileBuffer, async (pageBuffer) => {
+        return await runTesseractRecognition(pageBuffer)
+      })
 
-      for (const img of images) {
-        try {
-          const pageText = await runTesseractRecognition(img)
-          if (pageText) pageTexts.push(pageText)
-        } catch {
-          // ignore per-page tesseract failures
-        }
-      }
-
-      const joined = normalizeText(pageTexts.join('\n\n'))
       if (joined) {
         return {
           previewText: buildPreview(joined),
@@ -723,6 +753,32 @@ async function runTesseractOCR(params: {
         }
       } catch {
         // No-op: we'll fall back to text-layer output or final error.
+      }
+
+      // OCR AI may not accept raw PDFs reliably in every deployment.
+      // If the direct PDF attempt failed, retry with rasterized page images.
+      try {
+        const rasterizedAiText = await extractTextFromRasterizedPdfPages(
+          params.fileBuffer,
+          async (pageBuffer, pageNumber) => {
+            const pageResult = await runOCRAiPipeline({
+              fileBuffer: pageBuffer,
+              filePath: `${params.filePath.replace(/\.pdf$/i, '')}-page-${pageNumber}.png`,
+              mimeType: 'image/png',
+            })
+            return pageResult.fullText
+          }
+        )
+
+        if (rasterizedAiText) {
+          return {
+            previewText: buildPreview(rasterizedAiText),
+            fullText: rasterizedAiText,
+          } satisfies OCRExtractionResult
+        }
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error)
+        console.warn(`[OCR] OCR AI rasterized PDF fallback failed: ${message}`)
       }
     }
 
@@ -921,6 +977,7 @@ export async function runOCR(params: {
   const providerChain = getProviderChain()
 
   const triedProviders: string[] = []
+  const providerErrors: string[] = []
 
   for (const provider of providerChain) {
     triedProviders.push(provider)
@@ -971,6 +1028,7 @@ export async function runOCR(params: {
       // the failure explicit. Otherwise, continue to next configured provider.
       const failover = shouldEnableProviderFailover()
       const message = error instanceof Error ? error.message : String(error)
+      providerErrors.push(`${provider}: ${message}`)
       if (!failover) {
         throw new Error(`Provider ${provider} failed: ${message}`)
       }
@@ -979,8 +1037,10 @@ export async function runOCR(params: {
   }
 
   // If we reached here, no provider returned readable text.
+  const details = providerErrors.length ? ` Provider errors: ${providerErrors.join(' | ')}` : ''
   throw new Error(
-    `No readable text could be extracted using configured providers: ${triedProviders.join(', ')}. ` +
-      'Verify your OCR provider configuration (OCR_PROVIDER, OCR_PROVIDER_CHAIN, OCR_AI_ENDPOINT, and Google credentials), or upload a searchable PDF/image.'
+    `No readable text could be extracted using configured providers: ${triedProviders.join(', ')}.` +
+      details +
+      ' Verify your OCR provider configuration (OCR_PROVIDER, OCR_PROVIDER_CHAIN, OCR_AI_ENDPOINT, and Google credentials), or upload a searchable PDF/image.'
   )
 }
