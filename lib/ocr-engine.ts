@@ -488,6 +488,52 @@ async function extractFromPdfTextLayer(buffer: Buffer) {
   }
 }
 
+async function convertPdfToImagesWithSharp(buffer: Buffer, density = 200) {
+  // Attempt to rasterize PDF pages to PNG buffers using sharp.
+  // This uses sharp's `page` option to render individual pages. It requires
+  // libvips with PDF support (commonly available in hosted environments
+  // like Vercel when using the sharp binaries).
+  let sharpModule: typeof import('sharp')
+
+  try {
+    sharpModule = (await import('sharp')) as typeof import('sharp')
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err)
+    throw new Error(`PDF→image conversion requires 'sharp' but it failed to load: ${message}`)
+  }
+
+  const { PDFParse } = await loadPdfParseModule()
+  const parser = new PDFParse({ data: buffer })
+  let textResult: any
+
+  try {
+    textResult = await parser.getText()
+  } finally {
+    await parser.destroy().catch(() => undefined)
+  }
+
+  const pages = typeof textResult?.total === 'number' && textResult.total > 0 ? textResult.total : 1
+  const images: Buffer[] = []
+
+  for (let page = 0; page < pages; page += 1) {
+    try {
+      const img = await sharpModule(Buffer.from(buffer), { page, density })
+        .png()
+        .toBuffer()
+
+      images.push(img)
+    } catch (error: unknown) {
+      // If rendering a page fails, continue with other pages.
+    }
+  }
+
+  if (!images.length) {
+    throw new Error('Failed to rasterize PDF pages to images using sharp.')
+  }
+
+  return images
+}
+
 async function getTesseractRecognize(): Promise<TesseractRecognizeFn> {
   if (tesseractRecognizeSingleton) {
     return tesseractRecognizeSingleton
@@ -615,6 +661,33 @@ async function runTesseractOCR(params: {
       } catch {
         // Keep trying configured alternatives below.
       }
+    }
+
+    // As a last-resort for PDFs when tesseract is configured, attempt to
+    // rasterize PDF pages to images and run Tesseract per page. This allows
+    // purely scanned PDFs to be processed without Google Vision / OCR AI.
+    try {
+      const images = await convertPdfToImagesWithSharp(params.fileBuffer)
+      const pageTexts: string[] = []
+
+      for (const img of images) {
+        try {
+          const pageText = await runTesseractRecognition(img)
+          if (pageText) pageTexts.push(pageText)
+        } catch {
+          // ignore per-page tesseract failures
+        }
+      }
+
+      const joined = normalizeText(pageTexts.join('\n\n'))
+      if (joined) {
+        return {
+          previewText: buildPreview(joined),
+          fullText: joined,
+        } satisfies OCRExtractionResult
+      }
+    } catch {
+      // No-op; fall through to the existing PDF failure path below.
     }
 
     if (isProviderConfigured('ocr_ai')) {
@@ -820,22 +893,73 @@ export async function runOCR(params: {
 }) {
   validateOCRInput(params)
 
-  const tesseractResult = await runTesseractOCR({
-    ...params,
-    mimeType: inferMimeType(params.filePath, params.mimeType),
-  })
+  // Respect configured provider chain. Try each configured provider in order
+  // and return on first successful extraction. This allows deployments to
+  // set OCR_PROVIDER or OCR_PROVIDER_CHAIN to prefer OCR AI or Google Vision
+  // instead of the hard-coded tesseract-first behavior.
+  const providerChain = getProviderChain()
 
-  const normalizedFullText = normalizeText(tesseractResult.fullText)
+  const triedProviders: string[] = []
 
-  if (!normalizedFullText.trim()) {
-    throw new Error(
-      'Tesseract OCR produced no readable text. For scanned PDFs, use a searchable PDF or image capture, or re-upload a clearer document.'
-    )
+  for (const provider of providerChain) {
+    triedProviders.push(provider)
+
+    try {
+      if (provider === 'tesseract') {
+        const res = await runTesseractOCR({
+          ...params,
+          mimeType: inferMimeType(params.filePath, params.mimeType),
+        })
+
+        const normalized = normalizeText(res.fullText || '')
+        if (normalized.trim()) {
+          return {
+            ...res,
+            fullText: normalized,
+            previewText: buildPreview(normalized),
+          } satisfies OCRExtractionResult
+        }
+        // else continue to next provider
+      }
+
+      if (provider === 'google_vision') {
+        const res = await runGoogleVisionOCR(params)
+        const normalized = normalizeText(res.fullText || '')
+        if (normalized.trim()) {
+          return {
+            ...res,
+            fullText: normalized,
+            previewText: buildPreview(normalized),
+          } satisfies OCRExtractionResult
+        }
+      }
+
+      if (provider === 'ocr_ai') {
+        const res = await runOCRAiPipeline(params)
+        const normalized = normalizeText(res.fullText || '')
+        if (normalized.trim()) {
+          return {
+            ...res,
+            fullText: normalized,
+            previewText: buildPreview(normalized),
+          } satisfies OCRExtractionResult
+        }
+      }
+    } catch (error: unknown) {
+      // If failover is disabled, rethrow the provider-specific error to make
+      // the failure explicit. Otherwise, continue to next configured provider.
+      const failover = shouldEnableProviderFailover()
+      const message = error instanceof Error ? error.message : String(error)
+      if (!failover) {
+        throw new Error(`Provider ${provider} failed: ${message}`)
+      }
+      // continue to next provider
+    }
   }
 
-  return {
-    ...tesseractResult,
-    fullText: normalizedFullText,
-    previewText: buildPreview(normalizedFullText),
-  }
+  // If we reached here, no provider returned readable text.
+  throw new Error(
+    `No readable text could be extracted using configured providers: ${triedProviders.join(', ')}. ` +
+      'Verify your OCR provider configuration (OCR_PROVIDER, OCR_PROVIDER_CHAIN, OCR_AI_ENDPOINT, and Google credentials), or upload a searchable PDF/image.'
+  )
 }
