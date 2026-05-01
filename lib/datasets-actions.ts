@@ -627,6 +627,14 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
   if (download.error || !download.data) {
     const errorMsg = `Failed to download file for OCR: ${download.error?.message || 'Unknown download error'}`
     console.error(`[processDatasetOCR] ${errorMsg}`)
+    await logOCRRunEvent({
+      datasetId: params.datasetId,
+      status: 'failed',
+      sourceType,
+      providerHint,
+      durationMs: Date.now() - startedAt,
+      errorMessage: errorMsg,
+    })
     throw new Error(errorMsg)
   }
 
@@ -636,23 +644,50 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
   // Load OCR engine only when OCR is actually executed so draft/admin flows stay resilient.
   const { runOCR } = await import('@/lib/ocr-engine').catch((error: unknown) => {
     const message = error instanceof Error ? error.message : String(error)
-    throw new Error(`OCR runtime initialization failed: ${message}`)
+    const errorMsg = `OCR runtime initialization failed: ${message}`
+    console.error(`[processDatasetOCR] ${errorMsg}`)
+    throw new Error(errorMsg)
   })
 
-  const ocrResult = await runOCR({
-    fileBuffer,
-    filePath: resolved.fileName || resolved.filePath,
-    mimeType: resolved.mimeType,
-  })
+  let ocrResult: any
+  try {
+    ocrResult = await runOCR({
+      fileBuffer,
+      filePath: resolved.fileName || resolved.filePath,
+      mimeType: resolved.mimeType,
+    })
 
-  console.log(`[processDatasetOCR] OCR extraction completed:`, {
-    fullTextLength: ocrResult.fullText.length,
-    previewTextLength: ocrResult.previewText.length,
-  })
+    console.log(`[processDatasetOCR] OCR extraction completed:`, {
+      fullTextLength: ocrResult.fullText?.length || 0,
+      previewTextLength: ocrResult.previewText?.length || 0,
+    })
+  } catch (ocrError: unknown) {
+    const message = ocrError instanceof Error ? ocrError.message : String(ocrError)
+    const errorMsg = `OCR processing failed: ${message}`
+    console.error(`[processDatasetOCR] ${errorMsg}`)
+    await logOCRRunEvent({
+      datasetId: params.datasetId,
+      status: 'failed',
+      sourceType,
+      providerHint,
+      durationMs: Date.now() - startedAt,
+      errorMessage: errorMsg,
+    })
+    throw new Error(errorMsg)
+  }
 
-  if (!ocrResult.fullText.trim()) {
+  if (!ocrResult.fullText || !ocrResult.fullText.trim()) {
     const errorMsg = 'No readable text was detected from the uploaded file. Please retake the photo in portrait orientation, good lighting, and close framing.'
     console.error(`[processDatasetOCR] ${errorMsg}`)
+    await logOCRRunEvent({
+      datasetId: params.datasetId,
+      status: 'failed',
+      sourceType,
+      providerHint,
+      durationMs: Date.now() - startedAt,
+      fullTextChars: 0,
+      errorMessage: errorMsg,
+    })
     throw new Error(errorMsg)
   }
 

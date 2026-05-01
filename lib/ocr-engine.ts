@@ -841,10 +841,25 @@ async function runOCRAiRecognition(params: {
 
   const maxRetries = getOCRAiMaxRetries()
   let lastError = 'Unknown OCR AI failure'
+  const startTime = Date.now()
+
+  console.log(
+    `[OCR:AIRecognition] Starting OCR AI request (attempt 1/${maxRetries}): ` +
+    `endpoint="${endpoint}" file="${params.fileName}" size=${params.fileBuffer.length}bytes ` +
+    `mime="${params.mimeType}" apiKeySet=${Boolean(apiKey)} timeout=${timeoutMs}ms`
+  )
 
   for (let attempt = 1; attempt <= maxRetries; attempt += 1) {
     const controller = new AbortController()
     const timeoutHandle = setTimeout(() => controller.abort(), timeoutMs)
+    const attemptStartTime = Date.now()
+
+    // Exponential backoff: 100ms, 200ms, etc.
+    if (attempt > 1) {
+      const delayMs = Math.min(100 * (attempt - 1), 1000)
+      console.log(`[OCR:AIRecognition] Waiting ${delayMs}ms before retry attempt ${attempt}/${maxRetries}...`)
+      await new Promise((resolve) => setTimeout(resolve, delayMs))
+    }
 
     try {
       const formData = new FormData()
@@ -856,55 +871,139 @@ async function runOCRAiRecognition(params: {
         headers.Authorization = `Bearer ${apiKey}`
       }
 
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        body: formData,
-        headers,
-        signal: controller.signal,
-        cache: 'no-store',
-      })
+      console.log(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries}: Sending request to OCR AI...`)
+
+      // Add connection timeout (shorter than request timeout)
+      const connectionTimeoutMs = Math.min(5000, timeoutMs / 2)
+      const connectionController = new AbortController()
+      const connectionHandle = setTimeout(() => connectionController.abort(), connectionTimeoutMs)
+
+      let response: Response
+      try {
+        // First, test if the endpoint is reachable
+        const pingStart = Date.now()
+        response = await fetch(endpoint, {
+          method: 'POST',
+          body: formData,
+          headers,
+          signal: controller.signal,
+          cache: 'no-store',
+        })
+        clearTimeout(connectionHandle)
+        const connectionTime = Date.now() - pingStart
+
+        console.log(`[OCR:AIRecognition] Attempt ${attempt}: Connected in ${connectionTime}ms, status=${response.status}`)
+      } catch (connectionError) {
+        clearTimeout(connectionHandle)
+        throw connectionError
+      }
+
+      const duration = Date.now() - attemptStartTime
+      const contentType = response.headers.get('content-type') || 'unknown'
 
       if (!response.ok) {
         const body = await response.text().catch(() => '')
         const status = response.status
-        const message = `OCR AI service failed (${status}). ${body.slice(0, 300)}`
 
-        if (attempt < maxRetries && status >= 500) {
+        console.error(
+          `[OCR:AIRecognition] Attempt ${attempt}/${maxRetries} FAILED: status=${status} duration=${duration}ms ` +
+          `contentType="${contentType}" responseLength=${body.length}bytes`
+        )
+        console.error(
+          `[OCR:AIRecognition] Response body (first 500 chars): ${body.slice(0, 500)}`
+        )
+
+        const message = `OCR AI service failed with HTTP ${status}. ${body.slice(0, 300)}`
+
+        // Retry on server errors (5xx), timeouts, and transient failures
+        if (attempt < maxRetries && (status >= 500 || status === 429 || status === 408)) {
           lastError = message
+          console.log(`[OCR:AIRecognition] Retrying due to transient error (${status})...`)
           continue
         }
 
         throw new Error(message)
       }
 
-      const data = await response.json().catch(() => ({})) as Record<string, unknown>
+      const data = (await response.json().catch(() => ({}))) as Record<string, unknown>
       const candidate =
         (typeof data.fullText === 'string' && data.fullText) ||
         (typeof data.text === 'string' && data.text) ||
         ''
 
+      console.log(
+        `[OCR:AIRecognition] Attempt ${attempt}/${maxRetries} SUCCESS: status=200 duration=${duration}ms ` +
+        `extracted=${candidate.length}chars keys=[${Object.keys(data).join(', ')}]`
+      )
+
       const fullText = normalizeText(candidate)
       if (!fullText) {
-        throw new Error('OCR AI service returned no readable text.')
+        const keys = Object.keys(data).join(', ')
+        const message =
+          `OCR AI service returned empty text. Response keys: [${keys}]. ` +
+          `Full response: ${JSON.stringify(data).slice(0, 300)}`
+
+        console.error(`[OCR:AIRecognition] Empty text error: ${message}`)
+
+        if (attempt < maxRetries) {
+          lastError = message
+          console.log(`[OCR:AIRecognition] Retrying due to empty response...`)
+          continue
+        }
+
+        throw new Error(`OCR AI service returned no readable text. Response: ${JSON.stringify(data).slice(0, 200)}`)
       }
 
       return fullText
     } catch (error: unknown) {
+      const duration = Date.now() - attemptStartTime
+      let shouldRetry = false
+      let errorType = 'unknown'
+
       if (error instanceof DOMException && error.name === 'AbortError') {
         lastError = `OCR AI request timed out after ${timeoutMs}ms.`
+        errorType = 'timeout'
+        shouldRetry = attempt < maxRetries
+        console.error(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries} TIMEOUT: ${lastError}`)
+      } else if (error instanceof TypeError) {
+        if (error.message.includes('fetch failed')) {
+          lastError = `OCR AI endpoint unreachable: "${endpoint}". ${error.message}`
+          errorType = 'connection_failed'
+          shouldRetry = attempt < maxRetries
+          console.error(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries} CONNECTION ERROR: ${lastError}`)
+        } else if (error.message.includes('network')) {
+          lastError = `Network error: ${error.message}`
+          errorType = 'network_error'
+          shouldRetry = attempt < maxRetries
+          console.error(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries} NETWORK ERROR: ${lastError}`)
+        } else {
+          lastError = error.message
+          errorType = 'type_error'
+          console.error(
+            `[OCR:AIRecognition] Attempt ${attempt}/${maxRetries} TYPE ERROR (${duration}ms): ${lastError}`
+          )
+        }
       } else {
         lastError = error instanceof Error ? error.message : String(error)
+        console.error(
+          `[OCR:AIRecognition] Attempt ${attempt}/${maxRetries} ERROR (${duration}ms): ${lastError}`
+        )
       }
 
-      if (attempt >= maxRetries) {
-        throw new Error(`OCR AI request failed. ${lastError}`)
+      if (!shouldRetry || attempt >= maxRetries) {
+        const totalDuration = Date.now() - startTime
+        throw new Error(
+          `OCR AI request failed [${errorType}] after ${maxRetries} attempts (${totalDuration}ms total). ` +
+          `Last error: ${lastError}`
+        )
       }
     } finally {
       clearTimeout(timeoutHandle)
     }
   }
 
-  throw new Error(`OCR AI request failed. ${lastError}`)
+  const totalDuration = Date.now() - startTime
+  throw new Error(`OCR AI request failed (${totalDuration}ms total). ${lastError}`)
 }
 
 async function runOCRAiPipeline(params: {
@@ -912,40 +1011,68 @@ async function runOCRAiPipeline(params: {
   filePath: string
   mimeType?: string | null
 }) {
+  const startTime = Date.now()
   const mimeType = inferMimeType(params.filePath, params.mimeType)
   const sourceType = detectSourceType(params.filePath, mimeType)
 
+  console.log(
+    `[OCR:AIPipeline] Starting OCR AI pipeline: file="${params.filePath}" type="${sourceType}" ` +
+    `size=${params.fileBuffer.length}bytes mime="${mimeType}"`
+  )
+
   if (sourceType === 'docx') {
-    const docx = await extractFromDocx(params.fileBuffer)
-    const fullText = normalizeText(docx.fullText)
-    return {
-      previewText: buildPreview(fullText),
-      fullText,
-    } satisfies OCRExtractionResult
+    try {
+      const docx = await extractFromDocx(params.fileBuffer)
+      const fullText = normalizeText(docx.fullText)
+      const duration = Date.now() - startTime
+      console.log(`[OCR:AIPipeline] DOCX extraction SUCCESS: ${fullText.length} chars in ${duration}ms`)
+      return {
+        previewText: buildPreview(fullText),
+        fullText,
+      } satisfies OCRExtractionResult
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : String(error)
+      const duration = Date.now() - startTime
+      console.error(`[OCR:AIPipeline] DOCX extraction FAILED: ${message} (${duration}ms)`)
+      throw error
+    }
   }
 
   if (sourceType === 'pdf') {
+    console.log(`[OCR:AIPipeline] PDF detected: attempting text layer extraction...`)
+
     let pdfTextLayer: { fullText: string; confidence: number | null; pageCount: number | null } | null = null
 
     try {
       pdfTextLayer = await extractFromPdfTextLayer(params.fileBuffer)
-      console.log(`[OCR] OCR AI PDF text layer extraction: ${pdfTextLayer.fullText.length} chars extracted`)
+      console.log(`[OCR:AIPipeline] PDF text layer: ${pdfTextLayer.fullText.length} chars extracted`)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
-      console.warn(`[OCR] OCR AI PDF text layer extraction failed: ${message}`)
+      console.warn(`[OCR:AIPipeline] PDF text layer extraction failed: ${message}`)
     }
 
     const normalizedTextLayer = normalizeText(pdfTextLayer?.fullText || '')
     const minChars = getMinPdfFullTextChars()
 
     if (normalizedTextLayer.length >= minChars) {
+      const duration = Date.now() - startTime
+      console.log(
+        `[OCR:AIPipeline] PDF text layer sufficient (${normalizedTextLayer.length}/${minChars} chars). ` +
+        `Returning result in ${duration}ms`
+      )
       return {
         previewText: buildPreview(normalizedTextLayer),
         fullText: normalizedTextLayer,
       } satisfies OCRExtractionResult
     }
 
+    console.log(
+      `[OCR:AIPipeline] PDF text layer insufficient (${normalizedTextLayer.length}/${minChars} chars). ` +
+      `Attempting OCR AI direct recognition...`
+    )
+
     try {
+      const aiStartTime = Date.now()
       const fullText = await runOCRAiRecognition({
         fileBuffer: params.fileBuffer,
         fileName: params.filePath,
@@ -953,20 +1080,34 @@ async function runOCRAiPipeline(params: {
       })
 
       if (fullText.trim()) {
+        const aiDuration = Date.now() - aiStartTime
+        const totalDuration = Date.now() - startTime
+        console.log(
+          `[OCR:AIPipeline] OCR AI direct recognition SUCCESS: ${fullText.length} chars in ${aiDuration}ms ` +
+          `(total ${totalDuration}ms)`
+        )
         return {
           previewText: buildPreview(fullText),
           fullText,
         } satisfies OCRExtractionResult
       }
+
+      console.log(`[OCR:AIPipeline] OCR AI direct recognition returned empty text, trying rasterization...`)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
-      console.warn(`[OCR] OCR AI direct PDF extraction failed: ${message}`)
+      console.warn(`[OCR:AIPipeline] OCR AI direct PDF recognition failed: ${message}`)
     }
 
+    console.log(`[OCR:AIPipeline] Attempting rasterized PDF page recognition with OCR AI...`)
+
     try {
+      const rasterStartTime = Date.now()
       const rasterizedFullText = await extractTextFromRasterizedPdfPages(
         params.fileBuffer,
         async (pageBuffer, pageNumber) => {
+          console.log(
+            `[OCR:AIPipeline] Processing rasterized page ${pageNumber} (${pageBuffer.length} bytes)...`
+          )
           const pageResult = await runOCRAiRecognition({
             fileBuffer: pageBuffer,
             fileName: `${params.filePath.replace(/\.pdf$/i, '')}-page-${pageNumber}.png`,
@@ -978,38 +1119,70 @@ async function runOCRAiPipeline(params: {
       )
 
       if (rasterizedFullText.trim()) {
+        const rasterDuration = Date.now() - rasterStartTime
+        const totalDuration = Date.now() - startTime
+        console.log(
+          `[OCR:AIPipeline] Rasterized PDF recognition SUCCESS: ${rasterizedFullText.length} chars in ` +
+          `${rasterDuration}ms (total ${totalDuration}ms)`
+        )
         return {
           previewText: buildPreview(rasterizedFullText),
           fullText: rasterizedFullText,
         } satisfies OCRExtractionResult
       }
+
+      console.log(`[OCR:AIPipeline] Rasterized recognition returned empty, returning text layer fallback...`)
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error)
-      console.warn(`[OCR] OCR AI rasterized PDF extraction failed: ${message}`)
+      console.warn(`[OCR:AIPipeline] Rasterized PDF recognition failed: ${message}`)
     }
 
     if (normalizedTextLayer) {
+      const duration = Date.now() - startTime
+      console.log(
+        `[OCR:AIPipeline] All OCR attempts failed, returning text layer fallback (${normalizedTextLayer.length} chars) in ${duration}ms`
+      )
       return {
         previewText: buildPreview(normalizedTextLayer),
         fullText: normalizedTextLayer,
       } satisfies OCRExtractionResult
     }
 
-    throw new Error(
+    const duration = Date.now() - startTime
+    const errorMsg =
       'OCR AI could not extract readable text from this PDF. Try a searchable PDF, or enable a different OCR provider as fallback.'
-    )
+    console.error(`[OCR:AIPipeline] PDF processing FAILED in ${duration}ms: ${errorMsg}`)
+    throw new Error(errorMsg)
   }
 
-  const fullText = await runOCRAiRecognition({
-    fileBuffer: params.fileBuffer,
-    fileName: params.filePath,
-    mimeType,
-  })
+  // Handle images and other formats
+  console.log(`[OCR:AIPipeline] Processing non-PDF file (${sourceType})...`)
 
-  return {
-    previewText: buildPreview(fullText),
-    fullText,
-  } satisfies OCRExtractionResult
+  try {
+    const imageStartTime = Date.now()
+    const fullText = await runOCRAiRecognition({
+      fileBuffer: params.fileBuffer,
+      fileName: params.filePath,
+      mimeType,
+    })
+
+    const imageDuration = Date.now() - imageStartTime
+    const totalDuration = Date.now() - startTime
+    console.log(
+      `[OCR:AIPipeline] Image/file recognition SUCCESS: ${fullText.length} chars in ${imageDuration}ms ` +
+      `(total ${totalDuration}ms)`
+    )
+
+    return {
+      previewText: buildPreview(fullText),
+      fullText,
+    } satisfies OCRExtractionResult
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error)
+    const duration = Date.now() - startTime
+    console.error(`[OCR:AIPipeline] Image/file recognition FAILED in ${duration}ms: ${message}`)
+    throw error
+  }
 }
 
 export async function runGoogleVisionOCR(params: {
