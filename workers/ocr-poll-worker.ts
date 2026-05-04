@@ -60,7 +60,11 @@ async function workerLoop() {
 
       log.info({ jobId: job.id, datasetId: job.dataset_id }, 'processing job')
       try {
-        await processDatasetOCR({ datasetId: job.dataset_id, userId: job.user_id })
+        await processDatasetOCR({
+          datasetId: job.dataset_id,
+          userId: job.user_id,
+          supabaseClient: supabase,
+        })
         await markJobStatus(job.id, 'done', { finished_at: new Date().toISOString() })
         log.info({ jobId: job.id }, 'job done')
       } catch (err: any) {

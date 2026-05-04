@@ -1,5 +1,6 @@
 'use server'
 
+import { createClient as createSupabaseClient } from '@supabase/supabase-js'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { revalidateTag as nextRevalidateTag, revalidatePath as nextRevalidatePath } from 'next/cache'
 import { extractOcrInsights } from '@/lib/ocr-insights'
@@ -277,6 +278,21 @@ function isInvalidEnumValueError(message: string) {
   return normalized.includes('invalid input value for enum')
 }
 
+function getOcrSupabaseClient(explicitClient?: ReturnType<typeof createSupabaseClient>) {
+  if (explicitClient) {
+    return explicitClient
+  }
+
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error('Missing Supabase service client configuration for OCR processing.')
+  }
+
+  return createSupabaseClient(supabaseUrl, serviceRoleKey, { auth: { persistSession: false } })
+}
+
 function detectOCRSourceType(fileName: string, mimeType: string | null) {
   const lowerName = (fileName || '').toLowerCase()
   const lowerMime = (mimeType || '').toLowerCase()
@@ -307,11 +323,10 @@ async function logOCRRunEvent(input: {
   hasAbstract?: boolean | null
   isTitleOnlySource?: boolean | null
   errorMessage?: string | null
-}) {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const supabase = await createSupabaseServerClient(
-    serviceRoleKey ? { supabaseKey: serviceRoleKey } : {}
-  )
+}, explicitClient?: ReturnType<typeof createSupabaseClient>) {
+  const supabase = explicitClient ?? (await createSupabaseServerClient(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ? { supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY } : {}
+  ))
 
   const payload = {
     dataset_id: input.datasetId,
@@ -354,11 +369,10 @@ async function logOCRRunEvent(input: {
   }
 }
 
-async function updateOCRJobStatus(datasetId: string, status: 'queued' | 'processing' | 'done' | 'failed', errorMessage?: string) {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const supabase = await createSupabaseServerClient(
-    serviceRoleKey ? { supabaseKey: serviceRoleKey } : {}
-  )
+async function updateOCRJobStatus(datasetId: string, status: 'queued' | 'processing' | 'done' | 'failed', errorMessage?: string, explicitClient?: ReturnType<typeof createSupabaseClient>) {
+  const supabase = explicitClient ?? (await createSupabaseServerClient(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ? { supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY } : {}
+  ))
 
   const timestamp = new Date().toISOString()
   const normalizedErrorMessage = errorMessage ? errorMessage.slice(0, 1000) : null
@@ -410,11 +424,10 @@ async function updateOCRJobStatus(datasetId: string, status: 'queued' | 'process
 async function upsertOCRResults(datasetId: string, result: {
   previewText: string
   fullText: string
-}) {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const supabase = await createSupabaseServerClient(
-    serviceRoleKey ? { supabaseKey: serviceRoleKey } : {}
-  )
+}, explicitClient?: ReturnType<typeof createSupabaseClient>) {
+  const supabase = explicitClient ?? (await createSupabaseServerClient(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ? { supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY } : {}
+  ))
 
   // Validate that we have actual content to store
   const fullTextContent = (result.fullText || '').trim()
@@ -542,11 +555,10 @@ async function upsertOCRResults(datasetId: string, result: {
   }
 }
 
-async function resolveDatasetFilePath(datasetId: string, userId: string) {
-  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
-  const serviceClient = await createSupabaseServerClient(
-    serviceRoleKey ? { supabaseKey: serviceRoleKey } : {}
-  )
+async function resolveDatasetFilePath(datasetId: string, userId: string, explicitClient?: ReturnType<typeof createSupabaseClient>) {
+  const serviceClient = explicitClient ?? (await createSupabaseServerClient(
+    process.env.SUPABASE_SERVICE_ROLE_KEY ? { supabaseKey: process.env.SUPABASE_SERVICE_ROLE_KEY } : {}
+  ))
 
   const datasetResult = await serviceClient
     .from('datasets')
@@ -599,10 +611,12 @@ async function resolveDatasetFilePath(datasetId: string, userId: string) {
   }
 }
 
-async function processDatasetOCR(params: { datasetId: string; userId: string }) {
-  await updateOCRJobStatus(params.datasetId, 'processing')
+async function processDatasetOCR(params: { datasetId: string; userId: string; supabaseClient?: ReturnType<typeof createSupabaseClient> }) {
+  const supabaseClient = getOcrSupabaseClient(params.supabaseClient)
 
-  const resolved = await resolveDatasetFilePath(params.datasetId, params.userId)
+  await updateOCRJobStatus(params.datasetId, 'processing', undefined, supabaseClient)
+
+  const resolved = await resolveDatasetFilePath(params.datasetId, params.userId, supabaseClient)
   const providerHint = process.env.OCR_PROVIDER_CHAIN || process.env.OCR_PROVIDER || 'default'
   const sourceType = detectOCRSourceType(resolved.fileName || resolved.filePath, resolved.mimeType)
   
@@ -619,7 +633,7 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
     status: 'processing',
     sourceType,
     providerHint,
-  })
+  }, supabaseClient)
 
   const startedAt = Date.now()
   const download = await resolved.client.storage.from('datasets').download(resolved.filePath)
@@ -634,7 +648,7 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
       providerHint,
       durationMs: Date.now() - startedAt,
       errorMessage: errorMsg,
-    })
+    }, supabaseClient)
     throw new Error(errorMsg)
   }
 
@@ -687,11 +701,11 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
       durationMs: Date.now() - startedAt,
       fullTextChars: 0,
       errorMessage: errorMsg,
-    })
+    }, supabaseClient)
     throw new Error(errorMsg)
   }
 
-  await upsertOCRResults(params.datasetId, ocrResult)
+  await upsertOCRResults(params.datasetId, ocrResult, supabaseClient)
 
   const insights = extractOcrInsights(ocrResult.fullText || '')
   console.log(`[processDatasetOCR] OCR insights extracted:`, {
@@ -711,9 +725,9 @@ async function processDatasetOCR(params: { datasetId: string; userId: string }) 
     hasTitle: Boolean(insights.title?.trim()),
     hasAbstract: Boolean(insights.abstract?.trim()),
     isTitleOnlySource: looksLikeTitleOnlySource(ocrResult.fullText || ''),
-  })
+  }, supabaseClient)
 
-  await updateOCRJobStatus(params.datasetId, 'done')
+  await updateOCRJobStatus(params.datasetId, 'done', undefined, supabaseClient)
 }
 
 async function enqueueOCRJob(datasetId: string) {
