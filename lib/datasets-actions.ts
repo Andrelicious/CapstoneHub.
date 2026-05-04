@@ -1318,26 +1318,10 @@ export async function submitForOCR(datasetId: string) {
     }
   }
 
-  try {
-    await processDatasetOCR({ datasetId, userId: user.id })
-  } catch (error: any) {
-    const message = normalizeOCRFailureMessage(error?.message || 'Unknown OCR processing error')
-
-    await updateOCRJobStatus(datasetId, 'failed', message)
-    await logOCRRunEvent({
-      datasetId,
-      status: 'failed',
-      providerHint: process.env.OCR_PROVIDER_CHAIN || process.env.OCR_PROVIDER || 'default',
-      errorMessage: message,
-    })
-    // OCR failure should not block the submission wizard flow.
-    // The UI can continue to Step 3/4 and let admins review via uploaded file.
-    return { success: true, status: 'failed', message }
-  }
-
+  // Job was enqueued; return immediately so API requests aren't blocked.
   revalidateTag('datasets')
   revalidateTag(`dataset-${datasetId}`)
-  return { success: true, status: 'done' }
+  return { success: true, status: 'queued' }
 }
 
 /**

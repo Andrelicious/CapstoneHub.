@@ -11,7 +11,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "start": "next start"
+    "start": "next start",
+    "worker:poll": "pnpm dlx ts-node-esm workers/ocr-poll-worker.ts",
+    "validate:env": "pnpm dlx ts-node-esm scripts/validate-ocr-env.ts"
   },
   "dependencies": {
     "@google-cloud/vision": "^5.3.4",
