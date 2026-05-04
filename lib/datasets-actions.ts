@@ -1463,7 +1463,7 @@ export async function getOCRResults(datasetId: string) {
       .eq(columnFilter, datasetId)
       .maybeSingle()
 
-    if (read.error && isMissingCanonicalColumnError(read.error.message || '')) {
+    if (read.error && isMissingCanonicalOCRColumnError(read.error.message || '')) {
       read = await supabase
         .from('ocr_results')
         .select('preview_text, full_text, title, title_hint, abstract_text, quality_flags')
