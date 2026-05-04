@@ -1,8 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { processDatasetOCR } from '../lib/datasets-actions'
-import pino from 'pino'
 
-const log = pino({ name: 'ocr-worker' })
+const log = {
+  info: (obj: any, msg?: string) => console.log(`[${new Date().toISOString()}] INFO:`, msg || obj),
+  error: (obj: any, msg?: string) => console.error(`[${new Date().toISOString()}] ERROR:`, msg || obj),
+  warn: (obj: any, msg?: string) => console.warn(`[${new Date().toISOString()}] WARN:`, msg || obj),
+}
 
 const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL!
 const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!

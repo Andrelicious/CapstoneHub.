@@ -1,12 +1,14 @@
-import { validateOCREnvironment } from '../lib/ocr-diagnostics-extended'
+import { validateOCREnvironment, formatDiagnosticReport } from '../lib/ocr-diagnostics-extended'
 
 async function main() {
-  const missing = validateOCREnvironment()
-  if (missing.length) {
-    console.error('Missing OCR env vars:', missing)
+  const report = validateOCREnvironment()
+  const formatted = formatDiagnosticReport(report)
+  console.log(formatted)
+
+  if (report.errors && report.errors.length) {
     process.exit(2)
   }
-  console.log('OCR environment validated')
+
   process.exit(0)
 }
 
