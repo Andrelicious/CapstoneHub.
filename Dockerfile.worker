@@ -1,0 +1,39 @@
+# OCR Worker Docker Image
+# Includes Node.js, sharp (with libvips), and OCR dependencies
+
+FROM node:20-slim
+
+# Install system dependencies for sharp and OCR libraries
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    python3 \
+    libvips \
+    libvips-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy package files
+COPY package*.json ./
+COPY pnpm-lock.yaml* ./
+COPY pnpm-workspace.yaml* ./
+
+# Install dependencies
+RUN npm install --omit=dev --legacy-peer-deps || npm install --omit=dev --force
+
+# Copy application code
+COPY lib ./lib
+COPY workers ./workers
+COPY tsconfig.json ./
+
+# Set environment defaults (override at runtime)
+ENV NODE_ENV=production
+ENV OCR_WORKER_MAX_ATTEMPTS=3
+ENV OCR_POLLING_INTERVAL_MS=2000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD node -e "process.exit(0)" || exit 1
+
+# Start worker
+CMD ["npx", "tsx", "workers/ocr-poll-worker.ts"]

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  ocr-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: capstonehub-ocr-worker
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - OCR_PROVIDER=${OCR_PROVIDER:-tesseract}
+      - OCR_AI_ENDPOINT=${OCR_AI_ENDPOINT:-}
+      - OCR_WORKER_MAX_ATTEMPTS=3
+      - OCR_POLLING_INTERVAL_MS=2000
+    restart: unless-stopped
+    logs:
+      driver: 'json-file'
+      options:
+        max-size: '10m'
+        max-file: '3'
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'process.exit(0)']
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # Optional: Postgres for local testing (if needed)
+  # postgres:
+  #   image: postgres:15-alpine
+  #   environment:
+  #     - POSTGRES_PASSWORD=postgres
+  #   ports:
+  #     - '5432:5432'
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:
