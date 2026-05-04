@@ -611,7 +611,7 @@ async function resolveDatasetFilePath(datasetId: string, userId: string, explici
   }
 }
 
-async function processDatasetOCR(params: { datasetId: string; userId: string; supabaseClient?: ReturnType<typeof createSupabaseClient> }) {
+export async function processDatasetOCR(params: { datasetId: string; userId: string; supabaseClient?: ReturnType<typeof createSupabaseClient> }) {
   const supabaseClient = getOcrSupabaseClient(params.supabaseClient)
 
   await updateOCRJobStatus(params.datasetId, 'processing', undefined, supabaseClient)

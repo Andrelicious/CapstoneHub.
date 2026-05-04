@@ -58,11 +58,30 @@ async function workerLoop() {
         continue
       }
 
-      log.info({ jobId: job.id, datasetId: job.dataset_id }, 'processing job')
+      const { data: dataset, error: datasetError } = await supabase
+        .from('datasets')
+        .select('user_id')
+        .eq('id', job.dataset_id)
+        .maybeSingle()
+
+      if (datasetError || !dataset?.user_id) {
+        const message = datasetError?.message || 'Failed to resolve dataset owner for OCR job'
+        log.error({ jobId: job.id, datasetId: job.dataset_id, err: message }, 'job failed before OCR')
+        await markJobStatus(job.id, 'failed', {
+          finished_at: new Date().toISOString(),
+          error_message: message,
+          attempts: (job.attempts || 0) + 1,
+        })
+        continue
+      }
+
+      const userId = dataset.user_id as string
+
+      log.info({ jobId: job.id, datasetId: job.dataset_id, userId }, 'processing job')
       try {
         await processDatasetOCR({
           datasetId: job.dataset_id,
-          userId: job.user_id,
+          userId,
           supabaseClient: supabase,
         })
         await markJobStatus(job.id, 'done', { finished_at: new Date().toISOString() })
