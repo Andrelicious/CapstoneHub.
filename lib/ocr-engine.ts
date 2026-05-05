@@ -116,9 +116,9 @@ async function loadPdfParseModule() {
           try {
             // Use require as a last resort (CJS compatible path).
             const { createRequire } = await import('module')
-            // eslint-disable-next-line @typescript-eslint/no-var-requires
+             
             const req = createRequire(typeof document === 'undefined' ? import.meta.url : __filename)
-            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+             
             return req('pdf-parse')
           } catch (err3) {
             throw err3
@@ -342,7 +342,7 @@ function detectSourceType(fileName: string, mimeType: string | null): SupportedF
 function normalizeText(raw: string) {
   if (!raw) return ''
   
-  let normalized = raw
+  const normalized = raw
     .replace(/\u0000/g, '') // Remove null bytes
     .replace(/[\r\f\v]/g, '') // Remove carriage returns, form feeds, vertical tabs
     .replace(/\n\s*\n/g, '\n\n') // Normalize multiple newlines
@@ -893,6 +893,10 @@ async function runOCRAiRecognition(params: {
         const formData = new FormData()
         const blob = new Blob([params.fileBuffer], { type: params.mimeType })
         formData.append('file', blob, params.fileName)
+        // Include API key as form field for OCR providers that expect it (e.g. OCR.Space)
+        if (apiKey) {
+          try { formData.append('apikey', apiKey) } catch {}
+        }
         body = formData
       } else {
         // Node runtimes without global FormData/Blob can use the 'form-data' package.
@@ -903,6 +907,10 @@ async function runOCRAiRecognition(params: {
             filename: params.fileName,
             contentType: params.mimeType,
           })
+          // Include API key as form field for OCR providers that expect it (e.g. OCR.Space)
+          if (apiKey) {
+            try { nodeForm.append('apikey', apiKey) } catch {}
+          }
           body = nodeForm
           if (typeof nodeForm.getHeaders === 'function') {
             extraHeaders = nodeForm.getHeaders()
