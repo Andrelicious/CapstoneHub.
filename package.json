@@ -11,8 +11,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "start": "next start",
-    "worker:poll": "pnpm dlx ts-node-esm workers/ocr-poll-worker.ts",
+    "start": "node scripts/start.mjs",
+    "start:web": "next start",
+    "start:worker": "npx tsx workers/ocr-poll-worker.ts",
+    "worker:poll": "npx tsx workers/ocr-poll-worker.ts",
     "validate:env": "pnpm dlx ts-node-esm scripts/validate-ocr-env.ts"
   },
   "dependencies": {
