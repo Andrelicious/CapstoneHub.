@@ -844,14 +844,14 @@ async function getOCRResultDoneFallback(
 ) {
   let { data: result, error } = await supabase
     .from('ocr_results')
-    .select('dataset_id, full_text')
+    .select('dataset_id, title_hint, abstract_text, full_text, preview_text')
     .eq('dataset_id', datasetId)
     .maybeSingle()
 
   if (error && hasMissingColumnError(error.message || '', 'dataset_id')) {
     const fallback = await supabase
       .from('ocr_results')
-      .select('submission_id, full_text')
+      .select('submission_id, title_hint, abstract_text, full_text, preview_text')
       .eq('submission_id', datasetId)
       .maybeSingle()
 
@@ -880,6 +880,11 @@ async function getOCRResultDoneFallback(
   return {
     status: 'done',
     source: 'ocr_results_fallback',
+    datasetId: result.dataset_id || datasetId,
+    titleHint: (result as { title_hint?: string | null }).title_hint || null,
+    abstractText: (result as { abstract_text?: string | null }).abstract_text || null,
+    fullText: (result as { full_text?: string | null }).full_text || '',
+    previewText: (result as { preview_text?: string | null }).preview_text || null,
   }
 }
 
