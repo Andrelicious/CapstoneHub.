@@ -885,11 +885,37 @@ async function runOCRAiRecognition(params: {
     }
 
     try {
-      const formData = new FormData()
-      const blob = new Blob([new Uint8Array(params.fileBuffer)], { type: params.mimeType })
-      formData.append('file', blob, params.fileName)
+      // Build multipart body in a runtime-compatible way.
+      let body: unknown
+      let extraHeaders: Record<string, string> = {}
 
-      const headers: HeadersInit = {}
+      if (typeof FormData !== 'undefined' && typeof Blob !== 'undefined') {
+        const formData = new FormData()
+        const blob = new Blob([params.fileBuffer], { type: params.mimeType })
+        formData.append('file', blob, params.fileName)
+        body = formData
+      } else {
+        // Node runtimes without global FormData/Blob can use the 'form-data' package.
+        try {
+          const FormDataPkg = (await import('form-data')).default || (await import('form-data'))
+          const nodeForm: any = new FormDataPkg()
+          nodeForm.append('file', params.fileBuffer, {
+            filename: params.fileName,
+            contentType: params.mimeType,
+          })
+          body = nodeForm
+          if (typeof nodeForm.getHeaders === 'function') {
+            extraHeaders = nodeForm.getHeaders()
+          }
+        } catch {
+          throw new Error(
+            "This runtime doesn't provide FormData/Blob and 'form-data' package couldn't be loaded. " +
+              "Install 'form-data' or run on a Node version with native fetch/FormData support."
+          )
+        }
+      }
+
+      const headers: Record<string, string> = { ...extraHeaders }
       if (apiKey) {
         headers.Authorization = `Bearer ${apiKey}`
       }
@@ -907,7 +933,7 @@ async function runOCRAiRecognition(params: {
         const pingStart = Date.now()
         response = await fetch(endpoint, {
           method: 'POST',
-          body: formData,
+          body: body as BodyInit,
           headers,
           signal: controller.signal,
           cache: 'no-store',
