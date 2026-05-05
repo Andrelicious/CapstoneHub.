@@ -1286,10 +1286,12 @@ export async function runOCR(params: {
   }
 
   // If we reached here, no provider returned readable text.
-  const details = providerErrors.length ? ` Provider errors: ${providerErrors.join(' | ')}` : ''
+  const details = providerErrors.length ? ` (${providerErrors.join(' | ')})` : ''
+  const configuredProviders = providerChain.join(', ')
+  
   throw new Error(
-    `No readable text could be extracted using configured providers: ${triedProviders.join(', ')}.` +
-      details +
-      ' Verify your OCR provider configuration (OCR_PROVIDER, OCR_PROVIDER_CHAIN, OCR_AI_ENDPOINT, and Google credentials), or upload a searchable PDF/image.'
+    `Could not extract readable text from this document using ${configuredProviders}. ` +
+    `Please ensure your PDF has an embedded text layer or try a clearer image. ` +
+    `If the document appears blank, it may not contain extractable text.${details}`
   )
 }
