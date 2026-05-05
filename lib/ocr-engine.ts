@@ -6,7 +6,7 @@ type SupportedFileType = 'image' | 'pdf' | 'docx'
 type OCRProvider = 'google_vision' | 'tesseract' | 'ocr_ai'
 
 const DEFAULT_OCR_MAX_FILE_BYTES = 20 * 1024 * 1024
-const DEFAULT_OCR_TESSERACT_TIMEOUT_MS = 120000
+const DEFAULT_OCR_TESSERACT_TIMEOUT_MS = 240000
 const DEFAULT_OCR_AI_TIMEOUT_MS = 120000
 const DEFAULT_OCR_AI_MAX_RETRIES = 2
 const DEFAULT_OCR_MIN_PDF_FULL_TEXT_CHARS = 1200
@@ -102,7 +102,30 @@ function ensurePdfParsingGlobals() {
 async function loadPdfParseModule() {
   if (!pdfParseModulePromise) {
     ensurePdfParsingGlobals()
-    pdfParseModulePromise = import('pdf-parse')
+    // Try ESM dynamic import first, then fall back to a few known
+    // alternative entry points and finally a require() via
+    // `createRequire` if dynamic import fails due to worker bundling
+    // differences in serverless builds (pdf.worker.mjs missing).
+    pdfParseModulePromise = (async () => {
+      try {
+        return await import('pdf-parse')
+      } catch (err) {
+        try {
+          return await import('pdf-parse/dist/pdf-parse.js')
+        } catch (err2) {
+          try {
+            // Use require as a last resort (CJS compatible path).
+            const { createRequire } = await import('module')
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const req = createRequire(typeof document === 'undefined' ? import.meta.url : __filename)
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+            return req('pdf-parse')
+          } catch (err3) {
+            throw err3
+          }
+        }
+      }
+    })()
   }
 
   return pdfParseModulePromise
