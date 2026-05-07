@@ -111,18 +111,11 @@ async function loadPdfParseModule() {
         return await import('pdf-parse')
       } catch (err) {
         try {
-          return await import('pdf-parse/dist/pdf-parse.js')
-        } catch (err2) {
-          try {
-            // Use require as a last resort (CJS compatible path).
-            const { createRequire } = await import('module')
-             
-            const req = createRequire(typeof document === 'undefined' ? import.meta.url : __filename)
-             
-            return req('pdf-parse')
-          } catch (err3) {
-            throw err3
-          }
+          const { createRequire } = await import('module')
+          const req = createRequire(typeof document === 'undefined' ? import.meta.url : __filename)
+          return req('pdf-parse')
+        } catch (err3) {
+          throw err3
         }
       }
     })()
