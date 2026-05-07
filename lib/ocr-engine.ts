@@ -934,7 +934,7 @@ async function runOCRAiRecognition(params: {
       // Log header keys (sanitized) for debugging without leaking the key.
       try {
         const headerKeys = Object.keys(headers || {}).filter((k) => k.toLowerCase() !== 'authorization')
-        console.log(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries}: Sending request to OCR AI... headers=[${headerKeys.join(', ')}]`)
+          console.log(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries}: Sending request to OCR AI... headers=[${headerKeys.join(', ')}]`)
       } catch {
         console.log(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries}: Sending request to OCR AI...`)
       }
@@ -944,11 +944,28 @@ async function runOCRAiRecognition(params: {
       const connectionController = new AbortController()
       const connectionHandle = setTimeout(() => connectionController.abort(), connectionTimeoutMs)
 
+      // Some providers (notably OCR.Space) accept the API key as a query
+      // parameter named `apikey`. Add it to the endpoint URL when we detect
+      // an OCR.Space endpoint to maximize compatibility.
+      let requestEndpoint = endpoint
+      try {
+        const urlObj = new URL(endpoint)
+        if (apiKey && urlObj.hostname.includes('ocr.space')) {
+          if (!urlObj.searchParams.get('apikey')) {
+            urlObj.searchParams.set('apikey', apiKey)
+          }
+          requestEndpoint = urlObj.toString()
+        }
+      } catch {
+        // If URL parsing fails, fall back to the raw endpoint string.
+        requestEndpoint = endpoint
+      }
+
       let response: Response
       try {
         // First, test if the endpoint is reachable
         const pingStart = Date.now()
-        response = await fetch(endpoint, {
+        response = await fetch(requestEndpoint, {
           method: 'POST',
           body: body as BodyInit,
           headers,
