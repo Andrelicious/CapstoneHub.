@@ -925,10 +925,19 @@ async function runOCRAiRecognition(params: {
 
       const headers: Record<string, string> = { ...extraHeaders }
       if (apiKey) {
+        // Some OCR providers (e.g. OCR.Space) expect the key either as a
+        // form field or a header named `apikey`. Include both to be robust.
         headers.Authorization = `Bearer ${apiKey}`
+        headers.apikey = apiKey
       }
 
-      console.log(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries}: Sending request to OCR AI...`)
+      // Log header keys (sanitized) for debugging without leaking the key.
+      try {
+        const headerKeys = Object.keys(headers || {}).filter((k) => k.toLowerCase() !== 'authorization')
+        console.log(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries}: Sending request to OCR AI... headers=[${headerKeys.join(', ')}]`)
+      } catch {
+        console.log(`[OCR:AIRecognition] Attempt ${attempt}/${maxRetries}: Sending request to OCR AI...`)
+      }
 
       // Add connection timeout (shorter than request timeout)
       const connectionTimeoutMs = Math.min(5000, timeoutMs / 2)
