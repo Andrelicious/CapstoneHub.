@@ -1,14 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
-import mammoth from 'mammoth'
-
-type TesseractRecognizeResult = { data?: { text?: string } }
-type TesseractRecognizeFn = (image: Buffer, lang: string) => Promise<TesseractRecognizeResult>
 
 export const runtime = 'nodejs'
 
 function normalizeText(raw: string) {
   if (!raw) return ''
-
   return raw
     .replace(/\u0000/g, '')
     .replace(/[\r\f\v]/g, '')
@@ -17,89 +12,63 @@ function normalizeText(raw: string) {
     .trim()
 }
 
-function getMimeType(file: File) {
-  return (file.type || '').toLowerCase().trim()
+function extractOcrSpaceText(payload: any) {
+  const parsedResults = Array.isArray(payload?.ParsedResults) ? payload.ParsedResults : []
+  const combined = parsedResults
+    .map((item: any) => (typeof item?.ParsedText === 'string' ? item.ParsedText : ''))
+    .filter(Boolean)
+    .join('\n\n')
+
+  return normalizeText(combined)
 }
 
-function isPdf(file: File) {
-  const mime = getMimeType(file)
-  return mime.includes('pdf') || file.name.toLowerCase().endsWith('.pdf')
-}
+async function runExternalFreeOcr(file: File) {
+  const apiKey = (process.env.OCR_SPACE_API_KEY || 'helloworld').trim()
+  const endpoint = 'https://api.ocr.space/parse/image'
 
-function isDocx(file: File) {
-  const mime = getMimeType(file)
-  return mime.includes('wordprocessingml') || file.name.toLowerCase().endsWith('.docx')
-}
+  const form = new FormData()
+  form.append('file', file, file.name || 'upload.bin')
+  form.append('language', 'eng')
+  form.append('OCREngine', '2')
+  form.append('isOverlayRequired', 'false')
 
-async function getTesseractRecognize(): Promise<TesseractRecognizeFn> {
-  const tesseract = (await import('tesseract.js')) as {
-    recognize?: TesseractRecognizeFn
-    default?: { recognize?: TesseractRecognizeFn }
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      apikey: apiKey,
+    },
+    body: form,
+    cache: 'no-store',
+  })
+
+  const rawBody = await response.text()
+  let payload: any = null
+
+  try {
+    payload = JSON.parse(rawBody)
+  } catch {
+    throw new Error(`OCR.Space returned non-JSON response (status ${response.status})`)
   }
 
-  const recognize = tesseract?.recognize || tesseract?.default?.recognize
-  if (typeof recognize !== 'function') {
-    throw new Error('Invalid tesseract.js export in OCR AI endpoint')
+  if (!response.ok) {
+    throw new Error(`OCR.Space failed with HTTP ${response.status}`)
   }
 
-  return recognize
-}
-
-async function extractPdfTextLayer(buffer: Buffer) {
-  const pdfParse = await import('pdf-parse')
-  const parseFn = (pdfParse as { default?: (b: Buffer) => Promise<{ text?: string }> }).default
-
-  if (typeof parseFn !== 'function') {
-    throw new Error('pdf-parse default export not available')
-  }
-
-  const result = await parseFn(buffer)
-  return normalizeText(result?.text || '')
-}
-
-async function runInternalOcr(file: File) {
-  const arrayBuffer = await file.arrayBuffer()
-  const fileBuffer = Buffer.from(arrayBuffer)
-
-  if (!fileBuffer.length) {
-    throw new Error('Uploaded file is empty')
-  }
-
-  if (isDocx(file)) {
-    const docx = await mammoth.extractRawText({ buffer: fileBuffer })
-    const text = normalizeText(docx.value || '')
-    return {
-      fullText: text,
-      text,
-      provider: 'internal_tesseract_docx',
-    }
-  }
-
-  if (isPdf(file)) {
-    const textLayer = await extractPdfTextLayer(fileBuffer)
-    if (textLayer) {
-      return {
-        fullText: textLayer,
-        text: textLayer,
-        provider: 'internal_pdf_text_layer',
-      }
-    }
-    throw new Error('PDF text layer is empty in OCR AI endpoint')
-  }
-
-  const recognize = await getTesseractRecognize()
-  const lang = (process.env.OCR_TESSERACT_LANG || 'eng').trim() || 'eng'
-  const result = await recognize(fileBuffer, lang)
-  const text = normalizeText(result?.data?.text || '')
+  const text = extractOcrSpaceText(payload)
 
   if (!text) {
-    throw new Error('No readable text extracted from image')
+    const errMessage = Array.isArray(payload?.ErrorMessage)
+      ? payload.ErrorMessage.join(' | ')
+      : typeof payload?.ErrorMessage === 'string'
+        ? payload.ErrorMessage
+        : 'OCR.Space returned empty text'
+    throw new Error(errMessage)
   }
 
   return {
     fullText: text,
     text,
-    provider: 'internal_tesseract_image',
+    provider: 'ocr_space_free',
   }
 }
 
@@ -126,7 +95,7 @@ export async function POST(request: NextRequest) {
     }
 
     const startedAt = Date.now()
-    const extracted = await runInternalOcr(fileField)
+    const extracted = await runExternalFreeOcr(fileField)
     const durationMs = Date.now() - startedAt
 
     return NextResponse.json({

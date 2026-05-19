@@ -646,12 +646,24 @@ async function tryRunNativeTesseract(buffer: Buffer, lang = 'eng') {
 
     // Run tesseract CLI: output to stdout
     const args = [inPath, 'stdout', '-l', lang, '--oem', '1', '--psm', '3']
-    const { stdout } = await execFile('tesseract', args).catch((err: any) => {
-      // Some environments may not have tesseract; propagate as null to fallback
-      return Promise.reject(err)
-    }) as { stdout: string }
+    try {
+      const result = (await execFile('tesseract', args)) as { stdout?: string; stderr?: string }
+      const stdout = String(result?.stdout || '')
+      const stderr = String(result?.stderr || '')
 
-    return normalizeText(String(stdout || ''))
+      if (stderr) {
+        console.warn(`[OCR] native tesseract stderr: ${stderr.slice(0, 1000)}`)
+      }
+
+      return normalizeText(stdout)
+    } catch (err: any) {
+      // Log details so runtime shows why the CLI failed, but allow fallback to tesseract.js
+      const errMsg = err instanceof Error ? err.message : String(err)
+      const errStderr = err && typeof err === 'object' && 'stderr' in err ? String((err as any).stderr || '') : ''
+      console.error(`[OCR] native tesseract execution failed: ${errMsg}`)
+      if (errStderr) console.error(`[OCR] native tesseract error output: ${errStderr.slice(0, 2000)}`)
+      return null
+    }
   } catch (error) {
     return null
   } finally {
