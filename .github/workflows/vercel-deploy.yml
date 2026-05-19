@@ -21,7 +21,9 @@ jobs:
       - name: Install dependencies (pnpm)
         run: |
           corepack enable
-          pnpm install --frozen-lockfile
+          # Use --no-frozen-lockfile in CI when the lockfile is not committed yet.
+          # Recommended: run `pnpm install` locally and commit pnpm-lock.yaml for deterministic builds.
+          pnpm install --no-frozen-lockfile
 
       - name: Build
         run: |
