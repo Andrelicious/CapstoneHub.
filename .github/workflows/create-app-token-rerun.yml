@@ -1,0 +1,41 @@
+name: Create GitHub App Token and Rerun Latest Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      rerun_run_id:
+        description: 'Optional run id to rerun. If empty, uses latest run.'
+        required: false
+
+jobs:
+  create-and-rerun:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GitHub App token
+        id: create_token
+        uses: actions/create-github-app-token@v2
+        with:
+          app_id: ${{ secrets.GH_APP_ID }}
+          private_key: ${{ secrets.GH_APP_PRIVATE_KEY }}
+
+      - name: Determine run id to rerun
+        id: list_runs
+        run: |
+          set -e
+          if [ -n "${{ github.event.inputs.rerun_run_id }}" ]; then
+            echo "Using provided run id: ${{ github.event.inputs.rerun_run_id }}"
+            echo "run_id=${{ github.event.inputs.rerun_run_id }}" >> $GITHUB_OUTPUT
+          else
+            resp=$(curl -s -H "Authorization: Bearer ${{ steps.create_token.outputs.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=1")
+            run_id=$(echo "$resp" | jq -r '.workflow_runs[0].id')
+            echo "Latest run id: $run_id"
+            echo "run_id=$run_id" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Rerun workflow
+        run: |
+          echo "Rerunning run id ${{ steps.list_runs.outputs.run_id }}"
+          curl -X POST -s -H "Authorization: Bearer ${{ steps.create_token.outputs.token }}" -H "Accept: application/vnd.github+json" "https://api.github.com/repos/${{ github.repository }}/actions/runs/${{ steps.list_runs.outputs.run_id }}/rerun"
+
+      - name: Confirm
+        run: echo "Triggered rerun for run id ${{ steps.list_runs.outputs.run_id }}"
