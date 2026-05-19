@@ -1,4 +1,8 @@
 import fs from 'node:fs'
+import { execFile as _execFile } from 'node:child_process'
+import { tmpdir } from 'node:os'
+import { join as pathJoin } from 'node:path'
+import { promisify } from 'node:util'
 import { ImageAnnotatorClient, protos } from '@google-cloud/vision'
 import mammoth from 'mammoth'
 
@@ -631,14 +635,75 @@ async function getTesseractRecognize(): Promise<TesseractRecognizeFn> {
   return tesseractRecognizeSingleton
 }
 
+async function tryRunNativeTesseract(buffer: Buffer, lang = 'eng') {
+  const execFile = promisify(_execFile as any)
+  const tmp = tmpdir()
+  const fileName = `capstonehub-ocr-${Date.now()}-${Math.floor(Math.random() * 10000)}`
+  const inPath = pathJoin(tmp, `${fileName}.png`)
+
+  try {
+    await fs.promises.writeFile(inPath, buffer)
+
+    // Run tesseract CLI: output to stdout
+    const args = [inPath, 'stdout', '-l', lang, '--oem', '1', '--psm', '3']
+    const { stdout } = await execFile('tesseract', args).catch((err: any) => {
+      // Some environments may not have tesseract; propagate as null to fallback
+      return Promise.reject(err)
+    }) as { stdout: string }
+
+    return normalizeText(String(stdout || ''))
+  } catch (error) {
+    return null
+  } finally {
+    try { await fs.promises.rm(inPath).catch(() => undefined) } catch {}
+  }
+}
+
+async function preprocessImage(buffer: Buffer) {
+  try {
+    const sharp = (await import('sharp')) as typeof import('sharp')
+    const img = sharp.default ? (sharp as any).default : sharp
+    const instance = img(buffer)
+    const meta = await instance.metadata().catch(() => ({} as any))
+
+    // Ensure a reasonable minimum width for OCR, convert to grayscale and normalize
+    const width = typeof meta.width === 'number' && meta.width < 1000 ? 1000 : undefined
+
+    let pipeline = instance
+      .grayscale()
+      .normalize()
+
+    if (width) pipeline = pipeline.resize({ width, withoutEnlargement: false })
+
+    // Output as PNG for best compatibility
+    const out = await pipeline.png().toBuffer()
+    return out
+  } catch (err) {
+    return buffer
+  }
+}
+
 async function runTesseractRecognition(buffer: Buffer) {
   let timeoutHandle: ReturnType<typeof setTimeout> | null = null
 
   try {
-    const recognize = await getTesseractRecognize()
     const language = (process.env.OCR_TESSERACT_LANG || 'eng').trim() || 'eng'
-
     const timeoutMs = getTesseractTimeoutMs()
+
+    // Preprocess image to improve OCR accuracy and compatibility with native Tesseract
+    const preprocessed = await preprocessImage(buffer).catch(() => buffer)
+
+    // Try native Tesseract CLI first for speed and stability (if available)
+    try {
+      const nativeResult = await tryRunNativeTesseract(preprocessed, language)
+      if (nativeResult && nativeResult.trim()) {
+        return nativeResult
+      }
+    } catch (err) {
+      // Ignore native tesseract errors and fall back to tesseract.js
+    }
+
+    const recognize = await getTesseractRecognize()
 
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutHandle = setTimeout(() => {
@@ -646,14 +711,14 @@ async function runTesseractRecognition(buffer: Buffer) {
       }, timeoutMs)
     })
 
-    const result = (await Promise.race([recognize(buffer, language), timeoutPromise])) as TesseractRecognizeResult
+    const result = (await Promise.race([recognize(preprocessed, language), timeoutPromise])) as TesseractRecognizeResult
 
     const text = result?.data?.text || ''
     return normalizeText(text)
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : String(error)
     throw new Error(
-      `Tesseract OCR failed. Install tesseract.js and try again. Details: ${message}`
+      `Tesseract OCR failed. Install tesseract.js or ensure native 'tesseract' binary is available. Details: ${message}`
     )
   } finally {
     if (timeoutHandle) {
