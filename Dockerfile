@@ -1,7 +1,12 @@
 # Dockerfile to run CapstoneHub with native tesseract and image processing libs
 FROM node:20-bullseye-slim
 
-# Install system packages: tesseract, poppler for PDF rasterization, libvips for sharp
+# Use noninteractive frontend to avoid prompts during package installation
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install system packages: tesseract (native CLI), poppler for PDF rasterization,
+# libvips for sharp. Also install the English traineddata package. Remove apt
+# lists afterwards to keep the image small.
 RUN apt-get update \
   && apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -12,6 +17,10 @@ RUN apt-get update \
     build-essential \
     python3 \
   && rm -rf /var/lib/apt/lists/*
+
+# Ensure Tesseract knows where to find tessdata; system packages place tessdata
+# under /usr/share/tessdata on Debian-based images.
+ENV TESSDATA_PREFIX=/usr/share/tessdata
 
 WORKDIR /app
 
