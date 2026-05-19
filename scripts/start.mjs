@@ -1,4 +1,14 @@
-import { spawn } from 'node:child_process'
+import { spawn, exec } from 'node:child_process'
+
+// Log whether native tesseract binary is available (helpful for diagnosing deployments)
+exec('tesseract --version', (err, stdout, stderr) => {
+  if (err) {
+    console.warn('[startup] native tesseract not found or not executable:', err.message)
+  } else {
+    const firstLine = (stdout || '').split('\n')[0]
+    console.log('[startup] native tesseract available:', firstLine)
+  }
+})
 
 const isWorkerMode = ['true', '1', 'yes'].includes((process.env.WORKER_MODE || '').trim().toLowerCase())
 const args = isWorkerMode ? ['tsx', 'workers/ocr-poll-worker.ts'] : ['next', 'start']
