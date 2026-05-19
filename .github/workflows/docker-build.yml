@@ -40,3 +40,16 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository_owner }}/capstonehub:latest
             ghcr.io/${{ github.repository_owner }}/capstonehub:${{ github.sha }}
+
+      - name: Optional: Deploy to Railway
+        if: ${{ secrets.RAILWAY_API_KEY != '' && secrets.RAILWAY_SERVICE_ID != '' }}
+        env:
+          RAILWAY_API_KEY: ${{ secrets.RAILWAY_API_KEY }}
+          RAILWAY_SERVICE_ID: ${{ secrets.RAILWAY_SERVICE_ID }}
+        run: |
+          echo "Installing Railway CLI..."
+          npm i -g @railway/cli
+          echo "Logging into Railway..."
+          railway login --apiKey "$RAILWAY_API_KEY"
+          echo "Triggering redeploy for service $RAILWAY_SERVICE_ID"
+          railway service redeploy --service "$RAILWAY_SERVICE_ID" --yes
