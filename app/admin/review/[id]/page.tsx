@@ -67,46 +67,16 @@ async function getSubmissionData(id: string) {
   const readOcrResults = async (submissionId: string) => {
     let read = await dataSupabase
       .from('ocr_results')
-      .select('ocr_text, extracted_title, extracted_abstract, title, title_hint, abstract_text, full_text, quality_flags')
+      .select('*')
       .eq('dataset_id', submissionId)
       .maybeSingle()
 
     if (read.error && hasMissingColumnError(read.error.message || '', 'dataset_id')) {
       read = await dataSupabase
         .from('ocr_results')
-        .select('ocr_text, extracted_title, extracted_abstract, title, title_hint, abstract_text, full_text, quality_flags')
+        .select('*')
         .eq('submission_id', submissionId)
         .maybeSingle()
-    }
-
-    if (read.error) {
-      const missingInsightColumns =
-        hasMissingColumnError(read.error.message || '', 'title') ||
-        hasMissingColumnError(read.error.message || '', 'title_hint') ||
-        hasMissingColumnError(read.error.message || '', 'abstract_text') ||
-        hasMissingColumnError(read.error.message || '', 'ocr_text') ||
-        hasMissingColumnError(read.error.message || '', 'extracted_title') ||
-        hasMissingColumnError(read.error.message || '', 'extracted_abstract')
-
-      if (missingInsightColumns) {
-        let fallback = await dataSupabase
-          .from('ocr_results')
-          .select('title_hint, abstract_text, full_text, quality_flags')
-          .eq('dataset_id', submissionId)
-          .maybeSingle()
-
-        if (fallback.error && hasMissingColumnError(fallback.error.message || '', 'dataset_id')) {
-          fallback = await dataSupabase
-            .from('ocr_results')
-            .select('title_hint, abstract_text, full_text, quality_flags')
-            .eq('submission_id', submissionId)
-            .maybeSingle()
-        }
-
-        return fallback
-      }
-
-      return read
     }
 
     return read

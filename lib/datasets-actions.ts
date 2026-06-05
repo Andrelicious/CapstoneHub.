@@ -245,6 +245,7 @@ function hasMissingColumnError(message: string, column: string) {
     normalized.includes(`could not find the '${column}' column`) ||
     normalized.includes(`column "${column}" does not exist`) ||
     normalized.includes(`column ${column} does not exist`) ||
+    normalized.includes(`column ocr_results.${column} does not exist`) ||
     normalized.includes(`column datasets.${column} does not exist`) ||
     compact.includes(`column datasets.${column} does not exist`)
   )
@@ -1476,21 +1477,11 @@ export async function getOCRResults(datasetId: string) {
   const readOcrResults = async (useDatasetColumn: boolean) => {
     const columnFilter = useDatasetColumn ? 'dataset_id' : 'submission_id'
 
-    let read = await supabase
+    return supabase
       .from('ocr_results')
-      .select('preview_text, ocr_text, full_text, title, extracted_title, title_hint, abstract_text, extracted_abstract, quality_flags')
+      .select('*')
       .eq(columnFilter, datasetId)
       .maybeSingle()
-
-    if (read.error && isMissingCanonicalOCRColumnError(read.error.message || '')) {
-      read = await supabase
-        .from('ocr_results')
-        .select('preview_text, full_text, title, title_hint, abstract_text, quality_flags')
-        .eq(columnFilter, datasetId)
-        .maybeSingle()
-    }
-
-    return read
   }
 
   let { data: results, error } = await readOcrResults(true)

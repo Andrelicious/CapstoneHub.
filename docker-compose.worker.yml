@@ -15,7 +15,7 @@ services:
       - OCR_WORKER_MAX_ATTEMPTS=3
       - OCR_POLLING_INTERVAL_MS=2000
     restart: unless-stopped
-    logs:
+    logging:
       driver: 'json-file'
       options:
         max-size: '10m'
