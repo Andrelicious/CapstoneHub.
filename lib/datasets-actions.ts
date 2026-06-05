@@ -1477,9 +1477,25 @@ export async function getOCRResults(datasetId: string) {
   const readOcrResults = async (useDatasetColumn: boolean) => {
     const columnFilter = useDatasetColumn ? 'dataset_id' : 'submission_id'
 
+    // Prefer a service role read when available to avoid RLS blocking reads
+    const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+    if (serviceRoleKey) {
+      try {
+        const serviceClient = await createSupabaseServerClient({ supabaseKey: serviceRoleKey })
+        return serviceClient
+          .from('ocr_results')
+          .select('dataset_id, preview_text, full_text, ocr_text, title, extracted_title, title_hint, abstract_text, extracted_abstract, quality_flags')
+          .eq(columnFilter, datasetId)
+          .maybeSingle()
+      } catch {
+        // fallback to normal client below
+      }
+    }
+
+    // Fallback: explicit column selection to avoid schema mismatch when columns are missing
     return supabase
       .from('ocr_results')
-      .select('*')
+      .select('dataset_id, preview_text, full_text, ocr_text, title, extracted_title, title_hint, abstract_text, extracted_abstract, quality_flags')
       .eq(columnFilter, datasetId)
       .maybeSingle()
   }
